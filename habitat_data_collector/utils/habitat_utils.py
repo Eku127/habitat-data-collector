@@ -35,16 +35,16 @@ def make_cfg(cfg: DictConfig) -> habitat_sim.Configuration:
         with open(cfg.scene_config, "r") as file:
             config_data = json.load(file)
             scene_path = config_data['scene']['scene_path']
-            scene_config_path = config_data['scene']['scene_config_path']
+            scene_dataset_config = config_data['scene']['scene_dataset_config']
     else:
         # 使用直接定义在 cfg 中的路径
         scene_path = cfg.scene_path
-        scene_config_path = cfg.scene_config_path
+        scene_dataset_config = cfg.scene_dataset_config
     
     # define the scene
     sim_cfg.scene_id = scene_path
     # define the scene config for semantic
-    sim_cfg.scene_dataset_config_file = scene_config_path
+    sim_cfg.scene_dataset_config_file = scene_dataset_config
 
     # physics
     sim_cfg.enable_physics = cfg.physics_cfg.enable_physics
@@ -1171,7 +1171,7 @@ def save_config(cfg, all_rigid_objects, filepath):
     config_data = {
         'scene': {
             'scene_path': cfg.scene_path,
-            'scene_config_path': cfg.scene_config_path
+            'scene_dataset_config': cfg.scene_dataset_config
         },
         'id_handle_mapping': id_handle_dict,
         'objects': []

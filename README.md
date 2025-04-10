@@ -78,7 +78,8 @@ If you want to receive and send ROS2 topic outputs or record ROS2 bags:
 source /opt/ros/humble/setup.bash  # or source /opt/ros/humble/setup.zsh
 ```
 
-Once sourced, the simulator will publish data to ROS2 topics and allow you to record them by open ros recording config in `config/habitat_data_collector.yaml`
+Once sourced, the simulator will publish data to ROS2 topics, which can be recorded by enabling the ROS recording configuration in `config/habitat_data_collector.yaml`. Detailed information about topic configuration and ROS2-to-ROS1 bridging can be found in the [ROS Integration Documentation](documents/ros.md).
+
 
 
 ---

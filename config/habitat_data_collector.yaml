@@ -21,13 +21,13 @@ scene_config: /home/eku/workspace/dataset/HM3D_collect/00880-Nfvxx8J5NCo/dynamic
 
 # HM3D
 scene_path: /home/eku/workspace/dataset/HM3D/val/00829-QaLdnwvtxbs/QaLdnwvtxbs.basis.glb
-scene_config_path: /home/eku/workspace/dataset/HM3D/val/hm3d_annotated_basis.scene_dataset_config.json
+scene_dataset_config: /home/eku/workspace/dataset/HM3D/val/hm3d_annotated_basis.scene_dataset_config.json
 
 # THIS is for scene config
-# scene_config_path: /home/eku/workspace/habitat-sim/data/mp3d_example/mp3d.scene_dataset_config.json
-# scene_config_path: /home/eku/workspace/dataset/HM3D/val/hm3d_annotated_basis.scene_dataset_config.json
-# scene_config_path: /home/eku/workspace/dataset/Replica-Dataset/Replica_original/replica.scene_dataset_config.json
-# scene_config_path: /home/eku/workspace/dataset/Replica-Dataset/Replica_original/room_0/habitat/replica_stage.stage_config.json
+# scene_dataset_config: /home/eku/workspace/habitat-sim/data/mp3d_example/mp3d.scene_dataset_config.json
+# scene_dataset_config: /home/eku/workspace/dataset/HM3D/val/hm3d_annotated_basis.scene_dataset_config.json
+# scene_dataset_config: /home/eku/workspace/dataset/Replica-Dataset/Replica_original/replica.scene_dataset_config.json
+# scene_dataset_config: /home/eku/workspace/dataset/Replica-Dataset/Replica_original/room_0/habitat/replica_stage.stage_config.json
 
 # Object path
 objects_path: /home/eku/workspace/dataset/objects/new_objects

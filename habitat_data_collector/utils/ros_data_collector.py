@@ -1,4 +1,4 @@
-# applications/utils/ros_data_collector.py
+# utils/ros_data_collector.py
 
 try:
     import rclpy
