@@ -1,6 +1,7 @@
 defaults:
   - _self_
 
+# Scene Output Settings
 dataset_name: hm3d
 output_path: /home/eku/workspace/hiemap/data
 scene_name: 00829-QaLdnwvtxbs
@@ -9,29 +10,29 @@ scene_name: 00829-QaLdnwvtxbs
 # temp
 default_agent: 0
 
-# load from config
+# Scene Configuration
+# load from scene config
 # if load from scene config, then we no need define scene path in the following
 load_from_config: false
-scene_config: /home/eku/workspace/dataset/HM3D_collect/00880-Nfvxx8J5NCo/dynamic_scene_config/0117.json
-
-# scene_path: /home/eku/workspace/habitat-sim/data/mp3d_example/17DRP5sb8fy/17DRP5sb8fy.glb
-# scene_path: /home/eku/workspace/dataset/HM3D/val/00800-TEEsavR23oF/TEEsavR23oF.basis.glb
-# scene_path: /home/eku/workspace/dataset/Replica-Dataset/Replica_original/room_0/habitat/mesh_semantic.ply
-# scene_path: /home/eku/workspace/dataset/Replica-Dataset/Replica_original/room_0
+scene_config: /home/eku/workspace/dataset/HM3D_collect/00829-QaLdnwvtxbs/dynamic_scene_config/0117.json
 
 # HM3D
 scene_path: /home/eku/workspace/dataset/HM3D/val/00829-QaLdnwvtxbs/QaLdnwvtxbs.basis.glb
 scene_dataset_config: /home/eku/workspace/dataset/HM3D/val/hm3d_annotated_basis.scene_dataset_config.json
 
-# THIS is for scene config
+# MP3D
+# scene_path: /home/eku/workspace/habitat-sim/data/mp3d_example/17DRP5sb8fy/17DRP5sb8fy.glb
 # scene_dataset_config: /home/eku/workspace/habitat-sim/data/mp3d_example/mp3d.scene_dataset_config.json
-# scene_dataset_config: /home/eku/workspace/dataset/HM3D/val/hm3d_annotated_basis.scene_dataset_config.json
-# scene_dataset_config: /home/eku/workspace/dataset/Replica-Dataset/Replica_original/replica.scene_dataset_config.json
-# scene_dataset_config: /home/eku/workspace/dataset/Replica-Dataset/Replica_original/room_0/habitat/replica_stage.stage_config.json
 
-# Object path
+# Replica
+# scene_path: /home/eku/workspace/dataset/Replica-Dataset/Replica_original/room_0/habitat/mesh_semantic.ply
+# scene_dataset_config: /home/eku/workspace/dataset/Replica-Dataset/Replica_original/replica.scene_dataset_config.json
+
+
+# Object Path
 objects_path: /home/eku/workspace/dataset/objects/new_objects
 
+# Sensor and Camera Settings
 data_cfg:
   seed: 12
   rgb: true
@@ -42,6 +43,7 @@ data_cfg:
     h: 680
   camera_height: 1.5
 
+# Agent Movement
 movement_cfg:
   move_forward: 0.4
   move_backward: 0.4
@@ -53,6 +55,7 @@ movement_cfg:
 physics_cfg:
   enable_physics: true
 
+# Placable Categories
 placable_categories:
   - table
   - counter
@@ -64,7 +67,7 @@ placable_categories:
   - stool
 
 # Show the bounding box of all the placable categories
-show_placable_categories: false
+show_placable_categories: False
 
 frame_rate: 30.0
 
