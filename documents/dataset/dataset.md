@@ -47,7 +47,7 @@ These files are required for rendering semantics in the simulator.
 
 ### Configuration
 
-Refer to the [Scene Configuration](documents/config_reference/config_reference.md#-scene-configuration) section for more.
+Refer to the [Scene Configuration](documents/config_reference/config_reference.md) section for more.
 
 Example (using `00829-QaLdnwvtxbs`):
 
@@ -77,7 +77,7 @@ Habitat-Sim/data/scene_datasets/mp3d/
 ```
 
 ### Configuration
-
+Refer to the [Scene Configuration](documents/config_reference/config_reference.md) section for more.
 ```yaml
 scene_path: <PATH TO MP3D>/17DRP5sb8fy/17DRP5sb8fy.glb
 scene_dataset_config: <PATH TO MP3D>/mp3d_example/mp3d.scene_dataset_config.json
@@ -109,7 +109,7 @@ scene_dataset_config: <PATH TO MP3D>/mp3d_example/mp3d.scene_dataset_config.json
 ```
 
 ### Configuration
-
+Refer to the [Scene Configuration](documents/config_reference/config_reference.md) section for more.
 ```yaml
 scene_path: <PATH TO Replica>/room_0/habitat/mesh_semantic.ply
 scene_dataset_config: <PATH TO Replica>/replica.scene_dataset_config.json
@@ -148,6 +148,7 @@ scene_dataset_config: <PATH TO Replica>/replica.scene_dataset_config.json
 ```
 
 ### Configuration
+Refer to the [Object Configuration](documents/config_reference/config_reference.md) section for more.
 
 Use the following to load objects for insertion:
 
