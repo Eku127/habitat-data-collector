@@ -6,9 +6,9 @@
 
 ## 📝 TODO
 
-- [ ] **Write documentation for configuration and dataset format**
+- [x] **Write documentation for configuration and dataset format**
   - [x] Explain the structure and usage of `config/habitat_data_collector.yaml`
-  - [ ] Describe expected dataset directory structure (scene, object assets, etc.)
+  - [x] Describe expected dataset directory structure (scene, object assets, etc.)
 
 - [ ] **Write usage guide**
   - [ ] Basic usage and how to launch the simulator
@@ -55,7 +55,7 @@ bash scripts/install_habitat.sh
 
 ## 📦 Dataset Setup
 
-*To be documented.* This section will describe how to prepare and organize the datasets required to run the simulator, including supported formats and directory structures.
+Before running the tool, please follow the [dataset setup guide](documents/dataset/dataset.md) to prepare the required datasets.
 
 ---
 

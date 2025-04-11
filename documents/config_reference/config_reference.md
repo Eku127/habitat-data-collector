@@ -44,7 +44,7 @@ scene_dataset_config: /path/to/scene_dataset_config.json
 
 There are two modes for loading a scene:
 
-1. **Raw scene loading**: Directly load the scene asset provided by datasets such as HM3D or Replica. This will render the original environment without any manually placed objects. The detailed usage and directory layout for each dataset are described in `dataset.md`.
+1. **Raw scene loading**: Directly load the scene asset provided by datasets such as HM3D or Replica. This will render the original environment without any manually placed objects. The detailed usage and directory layout for each dataset are described in [dataset setup guide](../dataset/dataset.md).
 
 2. **Pre-arranged scene loading**: Load the full scene setup from a saved `scene_config` file. This includes the base scene along with user-defined object placements. This is the recommended approach for reproducible experiments or synthetic scene generation. Setup and saving procedures are explained in `usage.md`.
 
@@ -58,7 +58,7 @@ There are two modes for loading a scene:
 objects_path: /path/to/objects
 ```
 
-- `objects_path`: Directory containing object assets (GLB models) to be inserted during simulation. Currently we support the [YCB objects](https://www.ycbbenchmarks.com/). Detailed information can be found in `dataset.md`
+- `objects_path`: Directory containing object assets (GLB models) to be inserted during simulation. Currently we support the [YCB objects](https://www.ycbbenchmarks.com/). Detailed information can be found in [dataset setup guide](../dataset/dataset.md)
 
 ---
 
