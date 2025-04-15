@@ -100,7 +100,7 @@ ${output_path}/${dataset_name}/${scene_name}_X
 - `pose.txt`: Stores camera poses as 4x4 transformation matrices.
 
 <div align="center">
-  <img src="gif/recording.gif" alt="Recording Example" width="80%"/>
+  <img src="gif/recording.gif" alt="Recording Example" width="60%"/>
   <p><em>Example: Recording process visualization</em></p>
 </div>
 
