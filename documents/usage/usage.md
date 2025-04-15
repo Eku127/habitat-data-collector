@@ -18,7 +18,7 @@ See [Agent Movement Configuration](../config_reference/config_reference.md#-agen
 |----------|-----------------------------------------------------------|---------|
 | `m`      | Toggle top-down map view                                  | ![](gif/2-1.gif) |
 | `n`      | Randomly select a point on the map and start navigation   | ![](gif/2-2.gif) |
-| `e`      | Save all currently placed objects in the scene            | *(pending)* |
+| `e`      | Save all currently placed objects in the scene            |  |
 | `space`  | Start or stop recording (toggle)                          | ![](gif/2-4.gif) |
 
 
