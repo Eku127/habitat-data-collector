@@ -5,8 +5,8 @@
 | Key(s)           | Action                    | Preview |
 |------------------|----------------------------|---------|
 | `W` / `S`        | Move forward / backward    | <img src="gif/1-1.gif" alt="Move forward/backward" width="300"/> |
-| `A` / `D` or `←` / `→` | Rotate left / right view | ![](gif/1-2.gif) |
-| `↑` / `↓`         | Look up / down             | ![](gif/1-3.gif) |
+| `A` / `D` or `←` / `→` | Rotate left / right view | <img src="gif/1-2.gif" alt="Rotate view" width="300"/> |
+| `↑` / `↓`         | Look up / down             | <img src="gif/1-3.gif" alt="Look up/down" width="300"/> |
 
 See [Agent Movement Configuration](../config_reference/config_reference.md#-agent-movement) for details of setting scale of the movement.
 
@@ -16,10 +16,10 @@ See [Agent Movement Configuration](../config_reference/config_reference.md#-agen
 | Key      | Action                                                                 | Preview              |
 |----------|------------------------------------------------------------------------|----------------------|
 | `q`      | Exit the tool and save the recording                                    |                      |
-| `m`      | Toggle top-down map view                                                | ![](gif/2-1.gif)     |
-| `n`      | Select a point on the map and start navigation                          | ![](gif/2-2.gif)     |
+| `m`      | Toggle top-down map view                                                | <img src="gif/2-1.gif" alt="Top-down view" width="300"/> |
+| `n`      | Select a point on the map and start navigation                          | <img src="gif/2-2.gif" alt="Start navigation" width="300"/> |
 | `e`      | Save all placed objects and generate `scene_config.json`               |                      |
-| `space`  | Start or stop recording (toggle)                                        | ![](gif/2-4.gif)     |
+| `space`  | Start or stop recording (toggle)                                        | <img src="gif/2-4.gif" alt="Start/stop recording" width="300"/> |
 
 
 ### Scene Config Saving
@@ -108,8 +108,8 @@ ${output_path}/${dataset_name}/${scene_name}_X
 
 | Key      | Action                                                                 | Preview |
 |----------|------------------------------------------------------------------------|---------|
-| `+`      | Randomly add an object on a placeable surface                          | ![](gif/3-1.gif) |
-| `-`      | Randomly delete an object from the scene                               | ![](gif/3-2.gif) |
-| `p`      | Add an object to the currently viewed placeable surface                | ![](gif/3-3.gif) |
-| `g`      | Grab the nearest object                                                | ![](gif/3-4.gif) |
-| `r`      | Place the currently grabbed object on the nearest placeable surface    | ![](gif/3-5.gif) |
+| `+`      | Randomly add an object on a placeable surface                          | <img src="gif/3-1.gif" alt="Add object" width="300"/> |
+| `-`      | Randomly delete an object from the scene                               | <img src="gif/3-2.gif" alt="Delete object" width="300"/> |
+| `p`      | Add an object to the currently viewed placeable surface                | <img src="gif/3-3.gif" alt="Place object" width="300"/> |
+| `g`      | Grab the nearest object                                                | <img src="gif/3-4.gif" alt="Grab object" width="300"/> |
+| `r`      | Place the currently grabbed object on the nearest placeable surface    | <img src="gif/3-5.gif" alt="Place grabbed object" width="300"/> |
