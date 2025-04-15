@@ -4,7 +4,7 @@
 
 | Key(s)           | Action                    | Preview |
 |------------------|----------------------------|---------|
-| `W` / `S`        | Move forward / backward    | ![](gif/1-1.gif) |
+| `W` / `S`        | Move forward / backward    | <img src="gif/1-1.gif" alt="Move forward/backward" width="300"/> |
 | `A` / `D` or `←` / `→` | Rotate left / right view | ![](gif/1-2.gif) |
 | `↑` / `↓`         | Look up / down             | ![](gif/1-3.gif) |
 
