@@ -2,8 +2,6 @@
 
 **Habitat Data Collector** is a standalone simulation application built on top of [Habitat-Sim](https://github.com/facebookresearch/habitat-sim) and [Habitat-Lab](https://github.com/facebookresearch/habitat-lab). It supports scene loading, object insertion/removal, ROS2 output (pose, RGBD stream), and data recording. This tool is designed for collecting and testing datasets for robot perception, navigation, and mapping tasks.
 
----
-
 ## 📦 Environment Setup
 
 > 🖥️ This setup is tested on **Ubuntu 22.04** with **Python 3.10**.
@@ -31,19 +29,16 @@ conda activate habitat_data_collector
 bash scripts/install_habitat.sh
 ```
 
----
 
 ## 📦 Dataset Setup
 
 Before running the tool, please follow the [dataset setup guide](documents/dataset/dataset.md) to prepare the required datasets.
 
----
 
 ## ⚙️ Configuration Guide
 
 For a detailed explanation of configuration options and structure, please refer to the [Configuration Reference](documents/config_reference/config_reference.md). Setting up correct configs is crucial for running this tool.
 
----
 
 ## 🚀 Run the Collector
 
@@ -68,7 +63,6 @@ source /opt/ros/humble/setup.bash  # or setup.zsh
 
 Once sourced, the simulator will publish data to ROS2 topics. You can record them by enabling the ROS recording configuration in `config/habitat_data_collector.yaml`. See the [ROS Integration Documentation](documents/ros.md) for topic configuration and ROS2-to-ROS1 bridge setup.
 
----
 
 ## 📘 User Guide
 
@@ -81,7 +75,6 @@ Once sourced, the simulator will publish data to ROS2 topics. You can record the
 
 The guide includes visual previews and terminal output samples for better understanding.
 
----
 
 ## 📁 Project Structure
 
@@ -98,7 +91,6 @@ habitat-data-collector/
 └── README.md
 ```
 
----
 
 ## ⚠️ Notes
 
@@ -106,7 +98,6 @@ habitat-data-collector/
 - Configurations are handled with [OmegaConf](https://omegaconf.readthedocs.io/) and [Hydra](https://hydra.cc/).
 - All paths, topics, and behaviors are configured in `config/habitat_data_collector.yaml`.
 
----
 
 ## 🛠️ Developer Notes
 
@@ -115,7 +106,6 @@ To customize or extend the simulation:
 - Modify `config/habitat_data_collector.yaml` to adjust paths, topics, or options.
 - Extend functionality through `habitat_data_collector/utils/ros_data_collector.py` or `main.py`.
 
----
 
 ## 📜 License
 
