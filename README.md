@@ -12,6 +12,7 @@
   - [ROS2 Integration (Optional)](#-ros2-integration-optional)
 - [User Guide](#-user-guide)
 - [Project Structure](#-project-structure)
+- [Acknowledgment](#-acknowledgment)
 
 
 
@@ -111,14 +112,14 @@ habitat-data-collector/
 - Configurations are handled with [OmegaConf](https://omegaconf.readthedocs.io/) and [Hydra](https://hydra.cc/).
 - All paths, topics, and behaviors are configured in `config/habitat_data_collector.yaml`.
 
+## 🙏 Acknowledgment
 
-## 🛠️ Developer Notes
+This project builds on the outstanding work of:
 
-To customize or extend the simulation:
+- [Habitat-Sim](https://github.com/facebookresearch/habitat-sim) 
+- [Habitat-Lab](https://github.com/facebookresearch/habitat-lab) 
 
-- Modify `config/habitat_data_collector.yaml` to adjust paths, topics, or options.
-- Extend functionality through `habitat_data_collector/utils/ros_data_collector.py` or `main.py`.
-
+We thank the authors and contributors of these projects for making them open-source and actively maintained.
 
 ## 📜 License
 
