@@ -1,6 +1,6 @@
 # Habitat Data Collector
 
-**Habitat Data Collector** is a standalone simulation application built on top of [Habitat-Sim](https://github.com/facebookresearch/habitat-sim) and [Habitat-Lab](https://github.com/facebookresearch/habitat-lab). It supports scene loading, object insertion/removal, ROS2 output (pose, RGBD stream), and data recording. This tool is designed for collecting and testing datasets for robot perception, navigation, and mapping tasks.
+**Habitat Data Collector** is a standalone simulation application built on top of [Habitat-Sim](https://github.com/facebookresearch/habitat-sim) and [Habitat-Lab](https://github.com/facebookresearch/habitat-lab). It also allows researchers to customize their own object settings within Habitat-Sim and create dynamic scenes. It supports scene loading, object insertion/removal, ROS2 output (pose, RGBD stream), and data recording. This tool is designed for collecting and testing datasets for robot perception, navigation, and mapping tasks in both static and dynamic scenes.
 
 ## 📦 Environment Setup
 
