@@ -1,32 +1,12 @@
 # Habitat Data Collector
 
-**Habitat Data Collector** is a standalone simulation application built on top of [Habitat-Sim](https://github.com/facebookresearch/habitat-sim) and [Habitat-Lab](https://github.com/facebookresearch/habitat-lab). It supports scene loading, object insertion/removal, ROS2 output, and data recording. This tool is designed for collecting and testing datasets for robot perception, navigation, and mapping tasks.
-
----
-
-## 📝 TODO
-
-- [x] **Write documentation for configuration and dataset format**
-  - [x] Explain the structure and usage of `config/habitat_data_collector.yaml`
-  - [x] Describe expected dataset directory structure (scene, object assets, etc.)
-
-- [ ] **Write usage guide**
-  - [ ] Basic usage and how to launch the simulator
-  - [ ] Interactions: object picking, placing, and removing
-  - [ ] How to record data and where it's saved
-  - [ ] How to save and replay a scene setup
-  - [ ] How to random navigate and receive and follow a navigation route
-
-- [ ] **Add illustrations**
-  - [ ] Add a demo video or animated GIF showing typical usage
-  - [ ] Include example screenshots of the simulator running
-
+**Habitat Data Collector** is a standalone simulation application built on top of [Habitat-Sim](https://github.com/facebookresearch/habitat-sim) and [Habitat-Lab](https://github.com/facebookresearch/habitat-lab). It supports scene loading, object insertion/removal, ROS2 output (pose, RGBD stream), and data recording. This tool is designed for collecting and testing datasets for robot perception, navigation, and mapping tasks.
 
 ---
 
 ## 📦 Environment Setup
 
-> 🖥️ This setup is tested on **Ubuntu 22.04** with **Python 3.10** env.
+> 🖥️ This setup is tested on **Ubuntu 22.04** with **Python 3.10**.
 
 ### 1. Clone the repository with submodules
 
@@ -45,7 +25,7 @@ conda activate habitat_data_collector
 ### 3. Build and install Habitat Sim & Lab
 
 > This step will take some time as it compiles Habitat-Sim from source.
-> Habitat can not be installed by conda in Python 3.10 env. We have to build it from source.
+> Habitat cannot be installed by conda in Python 3.10, so it must be built manually.
 
 ```bash
 bash scripts/install_habitat.sh
@@ -61,8 +41,7 @@ Before running the tool, please follow the [dataset setup guide](documents/datas
 
 ## ⚙️ Configuration Guide
 
-For a detailed explanation of configuration options and structure, please refer to the [Configuration Reference](documents/config_reference/config_reference.md).
-
+For a detailed explanation of configuration options and structure, please refer to the [Configuration Reference](documents/config_reference/config_reference.md). Setting up correct configs is crucial for running this tool.
 
 ---
 
@@ -74,26 +53,33 @@ Run the main simulation from the root directory:
 python -m habitat_data_collector.main
 ```
 
-By default, it uses the configuration file at: `config/habitat_data_collector.yaml`, following [Config Reference](documents/config_reference/config_reference.md) for config information.
+By default, it uses the configuration file at: `config/habitat_data_collector.yaml`. For config details, refer to the [Config Reference](documents/config_reference/config_reference.md).
 
-
-
-### 🚁 ROS2 Integration (Optional)
+### ROS2 Integration (Optional)
 
 If you want to receive and send ROS2 topic outputs or record ROS2 bags:
 
-1. Make sure you have **ROS2 Humble** installed. You can follow the official installation guide:  
-   👉 [Install ROS2 Humble (Ubuntu 22.04)](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debians.html)
-
-2. Source the ROS2 environment **before** running the collector:
+1. Install **ROS2 Humble** following the [official guide](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debians.html).
+2. Source the ROS2 environment before running the collector:
 
 ```bash
-source /opt/ros/humble/setup.bash  # or source /opt/ros/humble/setup.zsh
+source /opt/ros/humble/setup.bash  # or setup.zsh
 ```
 
-Once sourced, the simulator will publish data to ROS2 topics, which can be recorded by enabling the ROS recording configuration in `config/habitat_data_collector.yaml`. Detailed information about topic configuration and ROS2-to-ROS1 bridging can be found in the [ROS Integration Documentation](documents/ros.md).
+Once sourced, the simulator will publish data to ROS2 topics. You can record them by enabling the ROS recording configuration in `config/habitat_data_collector.yaml`. See the [ROS Integration Documentation](documents/ros.md) for topic configuration and ROS2-to-ROS1 bridge setup.
 
+---
 
+## 📘 User Guide
+
+**Once the simulator launches successfully, refer to the [Usage Guide](documents/usage/usage.md) to learn how to**:
+
+- Move the camera and explore the scene
+- Add, place, grab, and delete objects
+- Start and stop recording (raw data + ROS2 bag)
+- Save and reload a scene configuration
+
+The guide includes visual previews and terminal output samples for better understanding.
 
 ---
 
@@ -106,7 +92,9 @@ habitat-data-collector/
 │   └── utils/
 ├── config/                   # YAML configuration files
 ├── 3rdparty/                 # Git submodules: habitat-sim & habitat-lab
-├── environment.yml           # Conda environment spec
+├── documents/               # Markdown documentation and media
+├── scripts/                 # Helper scripts (e.g. build, setup)
+├── environment.yml          # Conda environment spec
 └── README.md
 ```
 
@@ -114,17 +102,18 @@ habitat-data-collector/
 
 ## ⚠️ Notes
 
-- ROS2 Humble must be pre-installed and sourced before running.
-- Habitat-Sim and Habitat-Lab are included as Git submodules.
-- habitat-sim is compiled and installed using pip with editable mode.
-- habitat-lab is installed using `pip install -e .`.
-- Configuration is managed using [OmegaConf](https://omegaconf.readthedocs.io/) and [Hydra](https://hydra.cc/).
+- ROS2 Humble must be installed and sourced before using ROS features.
+- Configurations are handled with [OmegaConf](https://omegaconf.readthedocs.io/) and [Hydra](https://hydra.cc/).
+- All paths, topics, and behaviors are configured in `config/habitat_data_collector.yaml`.
 
 ---
 
-## 🛠️ Developer Info
+## 🛠️ Developer Notes
 
-To customize the scene, output, or ROS settings, modify `config/habitat_data_collector.yaml`. To extend functionality, explore the utilities in `habitat_data_collector/utils`.
+To customize or extend the simulation:
+
+- Modify `config/habitat_data_collector.yaml` to adjust paths, topics, or options.
+- Extend functionality through `habitat_data_collector/utils/ros_data_collector.py` or `main.py`.
 
 ---
 

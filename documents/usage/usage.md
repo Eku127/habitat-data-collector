@@ -22,7 +22,7 @@ See [Agent Movement Configuration](../config_reference/config_reference.md#-agen
 | `space`  | Start or stop recording (toggle)                                        | <img src="gif/2-4.gif" alt="Start/stop recording" width="300"/> |
 
 
-### Scene Config Saving
+### Scene Config Saving -> `e` 
 
 The scene configuration (`scene_config.json`) stores user-placed object positions to enable future reproducibility. After arranging objects in the scene, press `e` to save their locations. This file can be reloaded later to restore the same arrangement.
 
@@ -35,7 +35,7 @@ Configuration saved to ${output_path}/${dataset_name}/${scene_name}_X/scene_conf
 To reload, refer to the guide in [Scene Configuration](../config_reference/config_reference.md#-scene-configuration).
 
 
-### Recording
+### Recording -> `space` 
 
 The recording system captures both raw data and optionally a ROS2 bag, based on the config file.
 
@@ -113,3 +113,76 @@ ${output_path}/${dataset_name}/${scene_name}_X
 | `p`      | Add an object to the currently viewed placeable surface                | <img src="gif/3-3.gif" alt="Place object" width="300"/> |
 | `g`      | Grab the nearest object                                                | <img src="gif/3-4.gif" alt="Grab object" width="300"/> |
 | `r`      | Place the currently grabbed object on the nearest placeable surface    | <img src="gif/3-5.gif" alt="Place grabbed object" width="300"/> |
+
+
+### Add/Delete Objects (`+` / `-`)
+
+All object candidates are defined in the object directory, such as objects from the YCB dataset. See [Object Configuration](../config_reference/config_reference.md#-object-configuration) for setup.
+
+Objects are only placed on placable categories. These are defined in [Placable Categories](../config_reference/config_reference.md#-placable-categories), e.g., `sofa`, `table`, `desk`. You can visualize them by setting `show_placable_categories: true` in `habitat_data_collector.yaml`.
+
+When pressing `+` or `-`, objects are randomly added or deleted. Their positions can be viewed on the top-down map (press `m`). Added objects are shown as green points.
+
+
+
+<div align="center">
+  <img src="gif/objects.gif" alt="Place grabbed object" width="300"/>
+  <p><em>Example: Objects add/delete visualization</em></p>
+</div>
+
+
+Sample terminal logs:
+
+**Add:**
+```bash
+Adding object to scene...
+Object placed successfully. ID: 1, Semantic ID: 77
+Object added and recorded.
+Adding object to scene...
+Object placed successfully. ID: 4, Semantic ID: 25
+Object added and recorded.
+```
+
+**Delete:**
+```bash
+Removed object ID 7 from scene, remaining 4 objects.
+Removed object ID 5 from scene, remaining 3 objects.
+```
+
+> **Note:** If object manipulation is done during recording, changes will also be saved.
+
+
+### Place Objects in View (`p`)
+
+To quickly decorate a scene, press `p` while facing a placable object (e.g., a bed). This places the object directly on that surface.
+
+Terminal output:
+```bash
+Object placed successfully. ID: 3, Semantic ID: 19
+Object placed within camera view.
+```
+
+
+### Grab / Release Objects (`g` / `r`)
+
+To enable dynamic rearrangement of objects in a scene, use grab and release controls:
+
+- Stand near a placed object
+- Press `g` to grab the nearest object
+- Press `r` to place it on the nearest placable surface
+
+Terminal output:
+
+**Grab:**
+```bash
+Object ID: 3, 011_banana object is being grabbed, press 'r' to release to nearest bbox
+```
+
+**Release:**
+```bash
+Object placed successfully. ID: 3, Semantic ID: 19
+Object 011_banana released.
+```
+
+> **Note:** Make sure to grab an object before pressing `r`. Otherwise, you’ll receive: `No grabbed object, Please grab object first.`
+

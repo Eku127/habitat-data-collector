@@ -58,8 +58,20 @@ There are two modes for loading a scene:
 objects_path: /path/to/objects
 ```
 
-- `objects_path`: Directory containing object assets (GLB models) to be inserted during simulation. Currently we support the [YCB objects](https://www.ycbbenchmarks.com/). Detailed information can be found in [dataset setup guide](../dataset/dataset.md)
+- `objects_path`: Directory containing object assets (GLB models) to be inserted during simulation. Currently, only [YCB objects](https://www.ycbbenchmarks.com/) are supported. For more details, refer to the [dataset setup guide](../dataset/dataset.md).
 
+Once the `objects_path` is properly configured, you should see registration logs in the terminal similar to the following:
+
+```bash
+Registered 003_cracker_box with semantic ID: 29
+Registered 005_tomato_soup_can with semantic ID: 12
+Registered 011_banana with semantic ID: 87
+Registered 019_pitcher_base with semantic ID: 59
+Registered 024_bowl with semantic ID: 30
+Registered 025_mug with semantic ID: 74
+Registered 029_plate with semantic ID: 87
+Registered 037_scissors with semantic ID: 14
+```
 ---
 
 ## 🎥 Sensor and Camera Settings
