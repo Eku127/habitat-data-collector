@@ -121,6 +121,11 @@ This project builds on the outstanding work of:
 
 We thank the authors and contributors of these projects for making them open-source and actively maintained.
 
+
+This project is also inspired by the data collection pipeline from [VLMaps](https://github.com/vlmaps/vlmaps), and we are grateful to the authors of both [HOVSG](https://github.com/hovsg/HOV-SG) and [VLMaps](https://github.com/vlmaps/vlmaps) for their contributions.
+
+Special thanks to @[TOM-Huang](https://github.com/Tom-Huang) for valuable advice and support during development.
+
 ## 📜 License
 
 MIT License
