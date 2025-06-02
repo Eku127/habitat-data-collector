@@ -43,6 +43,11 @@ conda activate habitat_data_collector
 bash scripts/install_habitat.sh
 ```
 
+> During compiling with habitat-sim, if having error with OgenGL, like `Could NOT find OpenGL` and errors with compiling `zlib_external`, install the required libs by:
+>```bash
+> sudo apt install libgl1-mesa-dev libglu1-mesa-dev freeglut3-dev zlib1g-dev
+>```
+
 
 ## 📦 Dataset Setup
 
