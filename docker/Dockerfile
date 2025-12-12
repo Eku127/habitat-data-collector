@@ -56,7 +56,7 @@ RUN apt-get update && \
 RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10
 
 # Install Habitat-Sim
-RUN git clone --branch v0.3,3 https://github.com/facebookresearch/habitat-sim.git
+RUN git clone --branch v0.3.2 https://github.com/facebookresearch/habitat-sim.git
 WORKDIR /habitat-sim
 
 # Patch dependencies.cmake to force MAGNUM_TARGET_EGL to OFF
@@ -69,11 +69,13 @@ RUN CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DTARGET_HEADLESS=ON" pip ins
 
 # Install Habitat-Lab
 WORKDIR /
-RUN git clone --branch v0.3.3 https://github.com/facebookresearch/habitat-lab.git
+RUN git clone --branch v0.3.2 https://github.com/facebookresearch/habitat-lab.git
 WORKDIR /habitat-lab
 RUN pip install -e habitat-lab
 RUN pip install pybullet==3.0.4 pygame==2.1.2
 
+# Create symlink so 'python' points to 'python3'
+RUN ln -sf /usr/bin/python3 /usr/bin/python
 
 WORKDIR /app
 CMD ["/bin/bash"]

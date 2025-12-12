@@ -645,8 +645,8 @@ def save_scene_object_info(scene, scene_dir):
             
             # Get bounding box (AABB) details: center and size
             bbox = {
-                'center': [obj.aabb.center().x, obj.aabb.center().y, obj.aabb.center().z],  # Convert ndarray to list
-                'sizes': [obj.aabb.size().x, obj.aabb.size().y, obj.aabb.size().z]     # Convert ndarray to list
+                'center': obj.aabb.center.tolist(),  # Convert ndarray to list
+                'sizes': obj.aabb.sizes.tolist()     # Convert ndarray to list
             }
             
             # Add the bbox to the corresponding class
@@ -768,8 +768,8 @@ def get_bounding_boxes_for_category(sim, category_name):
         obj_category_name = obj.category.name() if obj.category else None
         if obj_category_name == category_name:
             # 提取包围盒的中心和大小信息
-            aabb_center = obj.aabb.center()
-            aabb_size = obj.aabb.size()
+            aabb_center = obj.aabb.center
+            aabb_size = obj.aabb.sizes
             bounding_box_info = {
                 "Object_ID": obj.id,
                 "Category": category_name,

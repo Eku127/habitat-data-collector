@@ -124,6 +124,8 @@ RUN colcon build \
     --parallel-workers $(nproc) \
     --packages-skip-build-finished
 
+# Uninstall numpy to remove the version from the base image (e.g. 2.x) before installing the version required by numba
+RUN pip3 uninstall -y numpy || true
 RUN pip3 install --ignore-installed "coverage>=7.2,<7.4" "numba==0.58.1"
 RUN apt-get update && apt-get install ros-humble-cv-bridge -y
 
