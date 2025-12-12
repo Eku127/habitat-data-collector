@@ -65,6 +65,48 @@ bash scripts/install_habitat.sh
 > sudo apt install libgl1-mesa-dev libglu1-mesa-dev freeglut3-dev zlib1g-dev
 >```
 
+### 🐳 Docker Setup
+As an alternative to Conda, you can also build an environment with Docker. Instead of steps 2 and 3 above you can build a Docker image using the provided compose file:
+
+```bash
+docker compose -f docker/compose.yml build
+```
+
+this will build an image called ```habitat-data-collector``` that has Cuda support and installs ```habitat-sim``` as well as ```habitat-lab``` from source.
+
+Once the build has completed you can launch a container with the same compose file:
+
+```bash
+docker compose -f docker/compose.yml up -d
+```
+
+and open an interactive shell:
+
+```bash
+docker exec -it <name-of-container> bash
+```
+
+### 🐳 Docker + 🐢 ROS2 Setup
+If you also want to use the ROS2 functionalities of this repo while running everything in Docker, there is an additional Dockerfile that builds ROS humble on top of the Docker image outlined above. The setup process is similar:
+
+Build the image:
+
+```bash
+docker compose -f docker/compose.humble.yml build
+```
+
+Start a container:
+
+```bash
+docker compose -f docker/compose.humble.yml up -d
+```
+
+and open an interactive shell:
+
+```bash
+docker exec -it <name-of-container> bash
+```
+
 
 ## 📦 Dataset Setup
 
