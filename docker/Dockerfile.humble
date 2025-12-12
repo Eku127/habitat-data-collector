@@ -124,11 +124,16 @@ RUN colcon build \
     --parallel-workers $(nproc) \
     --packages-skip-build-finished
 
-# Set up ROS 2 environment
-RUN echo "source /ros2_humble/install/setup.bash" >> /root/.bashrc
-
 RUN pip3 install --ignore-installed "coverage>=7.2,<7.4" "numba==0.58.1"
 RUN apt-get update && apt-get install ros-humble-cv-bridge -y
+
+# Set up ROS 2 environment
+RUN echo "source /ros2_humble/install/setup.bash" >> /root/.bashrc
+RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc
+
+# Create symlink so 'python' points to 'python3'
+RUN ln -sf /usr/bin/python3 /usr/bin/python
+
 # Set environment variables for ROS 2
 ENV ROS_DISTRO=humble
 ENV AMENT_PREFIX_PATH=/ros2_humble/install
