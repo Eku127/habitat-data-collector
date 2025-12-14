@@ -1,0 +1,150 @@
+# Build from the habitat-data-collector image that contains CUDA, Python 3.10, Habitat-Sim, and Habitat-Lab
+FROM habitat-data-collector:latest
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Set locale
+RUN apt-get update && apt-get install -y locales && \
+    locale-gen en_US en_US.UTF-8 && \
+    update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+
+# Add ROS 2 apt repository
+RUN apt-get update && apt-get install -y \
+    software-properties-common \
+    curl \
+    gnupg \
+    lsb-release \
+    && curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install dependencies for building ROS 2 from source
+RUN apt-get update && apt-get install -y \
+    wget \
+    unzip \
+    python3-pip \
+    python3-pytest-cov \
+    python3-flake8-docstrings \
+    python3-setuptools \
+    python3-vcstool \
+    python3-rosdep \
+    python3-colcon-common-extensions \
+    libasio-dev \
+    libtinyxml2-dev \
+    libcunit1-dev \
+    liblog4cxx-dev \
+    libyaml-cpp-dev \
+    libeigen3-dev \
+    libopencv-dev \
+    libssl-dev \
+    libacl1-dev \
+    libsqlite3-dev \
+    libxml2-dev \
+    libxslt1-dev \
+    libbullet-dev \
+    libconsole-bridge-dev \
+    liblttng-ust-dev \
+    lttng-tools \
+    python3-lttng \
+    python3-babeltrace \
+    libbenchmark-dev \
+    pybind11-dev \
+    python3-pybind11 \
+    qtbase5-dev \
+    libqt5core5a \
+    libqt5gui5 \
+    libqt5opengl5 \
+    libqt5widgets5 \
+    libspdlog-dev \
+    graphviz \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install additional Python dependencies for ROS 2
+# Using --ignore-installed to handle system packages that can't be uninstalled
+# Pinning empy<4 as ROS 2 Humble requires empy 3.x
+# Pinning setuptools<71 to maintain compatibility with ROS 2 Humble's build system
+RUN pip3 install --ignore-installed \
+    "setuptools==70.0.0" \
+    argcomplete \
+    flake8-blind-except \
+    flake8-builtins \
+    flake8-class-newline \
+    flake8-comprehensions \
+    flake8-deprecated \
+    flake8-import-order \
+    flake8-quotes \
+    pytest-repeat \
+    pytest-rerunfailures \
+    pytest \
+    lark \
+    catkin_pkg \
+    "empy<4" \
+    netifaces \
+    pyparsing \
+    pyyaml
+
+# Create ROS 2 workspace
+RUN mkdir -p /ros2_humble/src
+WORKDIR /ros2_humble
+
+# Download ROS 2 Humble source code
+# Using retry logic to handle transient GitHub failures
+RUN wget https://raw.githubusercontent.com/ros2/ros2/humble/ros2.repos && \
+    for i in 1 2 3 4 5; do \
+        vcs import src < ros2.repos && break || { echo "Retry $i failed, waiting 30s..."; sleep 30; }; \
+    done
+
+# Initialize rosdep
+RUN rosdep init || true && \
+    rosdep update
+
+# Install dependencies using rosdep
+RUN apt-get update && \
+    rosdep install --from-paths src --ignore-src -y --skip-keys "fastcdr rti-connext-dds-6.0.1 urdfdom_headers python3-catkin-pkg-modules python3-rosdistro-modules" || true && \
+    rm -rf /var/lib/apt/lists/*
+
+# Build ROS 2 Humble (desktop variant)
+# Using parallel jobs based on available memory to avoid OOM
+# Pre-download OGRE to avoid transient GitHub download failures
+RUN mkdir -p /ros2_humble/build/rviz_ogre_vendor/ogre-v1.12.1-prefix/src && \
+    cd /ros2_humble/build/rviz_ogre_vendor/ogre-v1.12.1-prefix/src && \
+    for i in 1 2 3 4 5; do \
+        wget -q https://github.com/OGRECave/ogre/archive/v1.12.1.zip && break || sleep 15; \
+    done && \
+    unzip -q v1.12.1.zip && \
+    rm v1.12.1.zip
+
+RUN colcon build \
+    --symlink-install \
+    --cmake-args -DCMAKE_BUILD_TYPE=Release \
+    --parallel-workers $(nproc) \
+    --packages-skip-build-finished
+
+# Uninstall numpy to remove the version from the base image (e.g. 2.x) before installing the version required by numba
+RUN pip3 uninstall -y numpy || true
+RUN pip3 install --ignore-installed "coverage>=7.2,<7.4" "numba==0.58.1"
+RUN apt-get update && apt-get install ros-humble-cv-bridge -y
+
+# Set up ROS 2 environment
+RUN echo "source /ros2_humble/install/setup.bash" >> /root/.bashrc
+RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc
+
+# Create symlink so 'python' points to 'python3'
+RUN ln -sf /usr/bin/python3 /usr/bin/python
+
+# Set environment variables for ROS 2
+ENV ROS_DISTRO=humble
+ENV AMENT_PREFIX_PATH=/ros2_humble/install
+ENV CMAKE_PREFIX_PATH=/ros2_humble/install
+ENV COLCON_PREFIX_PATH=/ros2_humble/install
+ENV LD_LIBRARY_PATH=/ros2_humble/install/lib:${LD_LIBRARY_PATH:-}
+ENV PATH=/ros2_humble/install/bin:${PATH:-}
+ENV PYTHONPATH=/ros2_humble/install/lib/python3.10/site-packages:${PYTHONPATH:-}
+ENV ROS_PYTHON_VERSION=3
+
+WORKDIR /app
+CMD ["/bin/bash"]
