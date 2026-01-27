@@ -43,10 +43,39 @@ The recording system captures both raw data and optionally a ROS2 bag, based on 
 > 
 > **Note:** Be sure to configure the output path properly in [Scene Output Settings](../config_reference/config_reference.md#-scene-output-settings).
 
+#### Save Mode
+
+The recording system supports two modes controlled by `save_mode` in the config:
+
+- **`timestamp` mode** (default): Saves every frame with timestamp-based filenames (e.g., `1744721112.0172191.png`)
+- **`action` mode**: Saves only when an action is executed, using index and action code filenames (e.g., `000001_1.png`)
+
+Set in `habitat_data_collector.yaml`:
+```yaml
+save_mode: action  # or "timestamp"
+```
+
+**Action Mode File Naming:**
+
+In action mode, each frame is named `{index}_{action_code}.png`, where the action code represents the **next action** to be executed:
+
+| Action | Code |
+|--------|------|
+| stop (last frame) | 0 |
+| move_forward | 1 |
+| turn_left | 2 |
+| turn_right | 3 |
+| move_backward | 4 |
+| look_up | 5 |
+| look_down | 6 |
+
+Example: `000005_1.png` means frame 5, and the next action will be "move_forward".
+
 When you press `space`, recording starts. A blinking red `REC` indicator appears in the bottom right corner. You will also see messages like:
 
 ```bash
-Recording started
+Recording started (save_mode: action)
+  -> Only frames with actual actions will be saved
 Start ROS bag recording: ${output_path}/${dataset_name}/${scene_name}_X/rosbag2
 [INFO] [rosbag2_recorder]: Press SPACE for pausing/resuming
 [INFO] [rosbag2_storage]: Opened database '.../rosbag2_0.db3' for READ_WRITE.
@@ -83,10 +112,10 @@ ${output_path}/${dataset_name}/${scene_name}_X
 ├── class_bbox.json
 ├── class_num.json
 ├── depth/
-│   ├── 1744721112.0172191.png
+│   ├── 000001_1.png (action mode) or 1744721112.0172191.png (timestamp mode)
 │   └── ...
 ├── rgb/
-│   ├── 1744721112.0172191.png
+│   ├── 000001_1.png (action mode) or 1744721112.0172191.png (timestamp mode)
 │   └── ...
 ├── pose.txt
 └── rosbag2/
@@ -96,8 +125,8 @@ ${output_path}/${dataset_name}/${scene_name}_X
 
 - `class_bbox.json`: Contains bounding boxes for each category.
 - `class_num.json`: Tracks the number of each category present.
-- `depth/`, `rgb/`: Image frames saved with timestamps.
-- `pose.txt`: Stores camera poses as 4x4 transformation matrices.
+- `depth/`, `rgb/`: Image frames. In action mode, named `{index}_{next_action_code}.png`; in timestamp mode, named with timestamps.
+- `pose.txt`: Stores camera poses as 4x4 transformation matrices. In action mode, each line starts with `{index}_{action_code}`.
 
 <div align="center">
   <img src="gif/recording.gif" alt="Recording Example" width="60%"/>

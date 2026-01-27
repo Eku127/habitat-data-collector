@@ -150,6 +150,18 @@ record_rosbag: true
 
 ---
 
+## 💾 Save Mode
+
+```yaml
+save_mode: action
+```
+
+- `save_mode`: Controls how data is saved during recording.
+  - `"timestamp"`: Saves every frame during recording with timestamp-based filenames (e.g., `1744721112.0172191.png`). This is the original behavior.
+  - `"action"`: Saves only when an action is executed (one frame per action) with index-based filenames (e.g., `000001.png`). This is more efficient for action-based tasks.
+
+---
+
 ## 🧩 Miscellaneous
 
 ```yaml

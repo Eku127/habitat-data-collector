@@ -17,6 +17,7 @@
 - ✅ Customize dynamic scenes and object layouts  
 - 📡 Stream ROS2 data (pose, RGB-D)  
 - 💾 Record and evaluate data for perception/navigation tasks
+- 🎯 Support both timestamp-based and action-based data saving modes
 
 
 
@@ -75,6 +76,18 @@ Before running the tool, please follow the [dataset setup guide](documents/datas
 
 For a detailed explanation of configuration options and structure, please refer to the [Configuration Reference](documents/config_reference/config_reference.md). Setting up correct configs is crucial for running this tool.
 
+### Save Mode Configuration
+
+The collector supports two data saving modes:
+
+- **`timestamp`**: Saves every frame during recording (original behavior)
+- **`action`**: Saves only when an action is executed (one frame per action)
+
+Configure in `config/habitat_data_collector.yaml`:
+```yaml
+save_mode: action  # or "timestamp"
+```
+
 
 ## 🚀 Run the Collector
 
@@ -116,14 +129,35 @@ The guide includes visual previews and terminal output samples for better unders
 
 ```
 habitat-data-collector/
-├── habitat_data_collector/   # Main application code
-│   ├── main.py
-│   └── utils/
-├── config/                   # YAML configuration files
-├── 3rdparty/                 # Git submodules: habitat-sim & habitat-lab
-├── documents/               # Markdown documentation and media
-├── scripts/                 # Helper scripts (e.g. build, setup)
-├── environment.yml          # Conda environment spec
+├── habitat_data_collector/       # Main application code
+│   ├── main.py                   # Entry point
+│   ├── app.py                    # Application class
+│   ├── config/                   # Configuration constants
+│   │   └── settings.py
+│   ├── core/                     # Core modules
+│   │   ├── state_manager.py      # Centralized state management
+│   │   ├── event_dispatcher.py   # Event-driven architecture
+│   │   └── simulator_service.py  # Habitat-Sim wrapper
+│   ├── handlers/                 # Action handlers
+│   │   ├── input_handler.py      # Keyboard input
+│   │   ├── recording_handler.py  # Recording/playback
+│   │   ├── navigation_handler.py # Navigation control
+│   │   └── object_handler.py     # Object manipulation
+│   ├── services/                 # Service layer
+│   │   ├── data_saver.py         # Data saving (timestamp/action modes)
+│   │   └── visualizer.py         # Visualization
+│   ├── adapters/                 # External integrations
+│   │   └── ros_adapter.py        # ROS2 integration
+│   └── utils/                    # Utility functions
+│       ├── coordinate_transform.py
+│       ├── config_factory.py
+│       ├── topdown_map.py
+│       └── scene_utils.py
+├── config/                       # YAML configuration files
+├── 3rdparty/                     # Git submodules: habitat-sim & habitat-lab
+├── documents/                    # Markdown documentation and media
+├── scripts/                      # Helper scripts (e.g. build, setup)
+├── environment.yml               # Conda environment spec
 └── README.md
 ```
 
@@ -164,4 +198,3 @@ Special thanks to @[TOM-Huang](https://github.com/Tom-Huang) and @[aclegg3](http
 ## 📜 License
 
 MIT License
-

@@ -39,16 +39,16 @@ data_cfg:
   depth: true
   semantic: true
   resolution:
-    w: 1200
-    h: 680
+    w: 640
+    h: 480
   camera_height: 1.5
 
 # Agent Movement
 movement_cfg:
-  move_forward: 0.4
-  move_backward: 0.4
-  turn_left: 3
-  turn_right: 3
+  move_forward: 0.25
+  move_backward: 0.25
+  turn_left: 15
+  turn_right: 15
   look_up: 3
   look_down: 3
 
@@ -71,10 +71,15 @@ show_placable_categories: False
 
 frame_rate: 30.0
 
+# Save mode: 
+# - "timestamp": Save every frame during recording (original behavior)
+# - "action": Save only when an action is executed (one frame per action)
+save_mode: action
+
 # Publish ROS2 topics
-use_ros: True
+use_ros: False
 # The recording can also record the rosbag along with the rgbd raw data
-record_rosbag: True
+record_rosbag: False
 
 # PLACEHOLDER, for mapping semantic_id to object handle
 # Do not Delete this holder
