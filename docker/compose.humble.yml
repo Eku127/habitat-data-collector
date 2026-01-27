@@ -1,0 +1,24 @@
+services:
+  habitat-data-collector-ros:
+    build:
+      context: .
+      dockerfile: Dockerfile.humble
+    image: habitat-data-collector-ros
+    network_mode: host
+    volumes:
+      - ../:/app
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - $HOME/.Xauthority:/root/.Xauthority
+      - /dev:/dev
+    environment:
+      - DISPLAY=${DISPLAY}
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, graphics, utility, compute]
+    stdin_open: true
+    tty: true
