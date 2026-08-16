@@ -113,6 +113,26 @@ docker exec -it <name-of-container> bash
 
 Before running the tool, please follow the [dataset setup guide](documents/dataset/dataset.md) to prepare the required datasets.
 
+For a Docker-based HM3D setup, copy `.env.example` to `.env`, add your
+Matterport API token, and run:
+
+```bash
+# Installs the non-008xx training scenes and the validation scenes.
+scripts/download_hm3d.sh train val
+
+# Discover and launch any installed scene.
+scripts/list_hm3d_scenes.sh train
+scripts/run_hm3d.sh 00006-HkseAnWCgqk train
+
+# Optional, but required by the add/grab/place object controls.
+scripts/download_ycb.sh
+```
+
+The launcher accepts either the full scene-folder name or its Matterport hash.
+Run `scripts/download_hm3d.sh minival` for a much smaller 10-scene smoke-test
+installation. Credentials in `.env` and all data under `data/` are ignored by
+Git.
+
 
 ## ⚙️ Configuration Guide
 

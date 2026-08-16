@@ -18,11 +18,39 @@ For general dataset guidance, refer to the [Habitat Dataset Documentation](https
 - Access: https://matterport.com/habitat-matterport-3d-research-dataset
 - GitHub (download tools): https://github.com/matterport/habitat-matterport-3dresearch
 
+### Download with Docker
+
+The `008xx` examples in this guide belong to the validation/minival splits;
+they are not a limitation of Habitat Data Collector. Install the HM3D v0.2
+`train` split to use the broader set of non-008xx scenes:
+
+```bash
+cp .env.example .env
+# Fill MATTERPORT_TOKEN_ID and MATTERPORT_TOKEN_SECRET in .env.
+
+# Habitat-ready BASIS meshes, navmeshes, and semantic annotations:
+scripts/download_hm3d.sh train val
+
+# A quicker 10-scene installation for checking the environment:
+scripts/download_hm3d.sh minival
+```
+
+The default download is the BASIS-compressed Habitat format; raw GLBs are not
+needed by this collector. Downloads are resumable. List or run installed scenes
+without editing YAML paths manually:
+
+```bash
+scripts/list_hm3d_scenes.sh train
+scripts/run_hm3d.sh <scene-folder-or-Matterport-hash> train
+scripts/validate_hm3d.sh <scene-folder-or-Matterport-hash> train
+```
+
 ### HM3D Dataset Structure
 
 Make sure the dataset is downloaded and organized as follows:
 
-> You only need to download the `val` split for testing in `008xx` scenes.
+> The `val` split is sufficient only when testing `008xx` scenes. Download
+> `train` for a substantially broader experiment set.
 
 ```
 <PATH_TO_HM3D>/
@@ -156,6 +184,14 @@ Use the following to load objects for insertion:
 ```yaml
 objects_path: <PATH TO YCB>/configs
 ```
+
+With the Docker setup, install and configure the Habitat-ready YCB pack with:
+
+```bash
+scripts/download_ycb.sh
+```
+
+The `scripts/run_hm3d.sh` launcher automatically uses its `configs` directory.
 
 By default, the YCB dataset includes many objects. You can **selectively load** specific objects by copying only their config files to a reduced `configs/` directory.
 

@@ -7,7 +7,7 @@ dependencies:
   - python=3.10
   - cmake
   - pip
-  - numpy
+  - numpy<2
   - pillow
   - matplotlib
   - pyyaml

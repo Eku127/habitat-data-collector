@@ -74,6 +74,11 @@ WORKDIR /habitat-lab
 RUN pip install -e habitat-lab
 RUN pip install pybullet==3.0.4 pygame==2.1.2
 
+# Habitat-Lab 0.3.2 expects the NumPy 1.x API and OpenCV 4.x array shapes.
+# Without these pins, a fresh build can install NumPy 2 / OpenCV 5 and crash
+# when object placement imports habitat.utils.visualizations.maps.
+RUN pip install --no-cache-dir "numpy<2" "opencv-python==4.10.0.84"
+
 # Create symlink so 'python' points to 'python3'
 RUN ln -sf /usr/bin/python3 /usr/bin/python
 
