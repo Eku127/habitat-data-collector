@@ -81,6 +81,41 @@ use_ros: False
 # The recording can also record the rosbag along with the rgbd raw data
 record_rosbag: False
 
+# DualMap scene-layout authoring. Disabled by default so normal collector
+# controls and output behavior remain unchanged.
+authoring:
+  enabled: false
+  output_root: /app/outputs/dualmap_authoring
+  layout_type: static
+  layout_index: null
+  overwrite: false
+  minimum_placed: 6
+  targets:
+    - key: 1
+      semantic_id: 50001
+      handle: 003_cracker_box
+    - key: 2
+      semantic_id: 50002
+      handle: 005_tomato_soup_can
+    - key: 3
+      semantic_id: 50007
+      handle: 011_banana
+    - key: 4
+      semantic_id: 50003
+      handle: 019_pitcher_base
+    - key: 5
+      semantic_id: 50004
+      handle: 024_bowl
+    - key: 6
+      semantic_id: 50008
+      handle: 025_mug
+    - key: 7
+      semantic_id: 50005
+      handle: 029_plate
+    - key: 8
+      semantic_id: 50006
+      handle: 037_scissors
+
 # PLACEHOLDER, for mapping semantic_id to object handle
 # Do not Delete this holder
 id_handle_dict: {}

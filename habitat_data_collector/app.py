@@ -15,6 +15,11 @@ from .handlers import InputHandler, RecordingHandler, NavigationHandler, ObjectH
 from .services import DataSaver, Visualizer
 from .utils.config_factory import ConfigFactory
 from .config.settings import DEFAULT_FPS
+from .authoring import (
+    AnchorInfo,
+    layout_output_path,
+    validate_authoring_layout,
+)
 
 
 class Application:
@@ -28,19 +33,45 @@ class Application:
         """
         self.cfg = cfg
         
-        # Setup output directory
-        os.makedirs(cfg.output_path, exist_ok=True)
-        dataset_dir = Path(cfg.output_path) / cfg.dataset_name
-        
-        # Find next available scene directory
-        scene_id = 1
-        while True:
-            scene_dir = dataset_dir / f"{cfg.scene_name}_{scene_id}"
-            if not scene_dir.exists():
-                break
-            scene_id += 1
-        
-        print(f"Collecting data for scene {cfg.scene_name} in dataset {cfg.dataset_name}...")
+        # Setup output directory. Authoring uses a stable scene directory so
+        # support metadata and named layout slots stay together.
+        authoring_cfg = cfg.get("authoring")
+        authoring_enabled = bool(
+            authoring_cfg and authoring_cfg.get("enabled", False)
+        )
+        if authoring_enabled:
+            layout_type = str(authoring_cfg.layout_type)
+            raw_index = authoring_cfg.get("layout_index")
+            layout_index = None if raw_index is None else int(raw_index)
+            layout_output_path(
+                Path(authoring_cfg.output_root),
+                str(cfg.scene_name),
+                layout_type,
+                layout_index,
+            )
+            if layout_type == "static" and cfg.load_from_config:
+                raise ValueError("Static authoring must start from the raw scene.")
+            if layout_type != "static" and not cfg.load_from_config:
+                raise ValueError(
+                    "Dynamic authoring must load the authored static config."
+                )
+            scene_dir = Path(authoring_cfg.output_root) / str(cfg.scene_name)
+            print(
+                f"Authoring {layout_type} layout for scene {cfg.scene_name}..."
+            )
+        else:
+            os.makedirs(cfg.output_path, exist_ok=True)
+            dataset_dir = Path(cfg.output_path) / cfg.dataset_name
+            scene_id = 1
+            while True:
+                scene_dir = dataset_dir / f"{cfg.scene_name}_{scene_id}"
+                if not scene_dir.exists():
+                    break
+                scene_id += 1
+            print(
+                f"Collecting data for scene {cfg.scene_name} "
+                f"in dataset {cfg.dataset_name}..."
+            )
         print(f"Data will be saved at {scene_dir}")
         scene_dir.mkdir(parents=True, exist_ok=True)
         
@@ -48,6 +79,7 @@ class Application:
         
         # Initialize core components
         self.state_manager = StateManager()
+        self.state_manager.configure_authoring(authoring_cfg)
         self.event_dispatcher = EventDispatcher()
         
         # Create simulator
@@ -219,10 +251,41 @@ class Application:
     
     def _handle_save_config(self, event):
         """Handle save config event."""
-        self.data_saver.save_scene_config(
-            self.state_manager.objects.id_handle_dict,
-            self.state_manager.objects.all_rigid_objects
-        )
+        authoring = self.state_manager.authoring
+        if authoring.enabled:
+            result = validate_authoring_layout(
+                targets=authoring.targets,
+                object_semantic_ids=[
+                    int(obj.semantic_id)
+                    for obj in self.state_manager.objects.all_rigid_objects
+                ],
+                anchors=authoring.anchors,
+                layout_type=authoring.layout_type,
+                baseline_anchors=authoring.baseline_anchors,
+                baseline_semantic_ids=authoring.baseline_semantic_ids,
+                relocated_semantic_ids=authoring.relocated_semantic_ids,
+                minimum_placed=authoring.minimum_placed,
+            )
+            authoring.last_status = result.message
+            authoring.last_status_ok = result.valid
+            if not result.valid:
+                print(f"Authoring save blocked: {result.message}")
+                return
+        try:
+            saved_path = self.data_saver.save_scene_config(
+                self.state_manager.objects.id_handle_dict,
+                self.state_manager.objects.all_rigid_objects,
+                authoring_state=authoring if authoring.enabled else None,
+            )
+        except (FileExistsError, OSError, ValueError) as exc:
+            if authoring.enabled:
+                authoring.last_status = str(exc)
+                authoring.last_status_ok = False
+            print(f"Configuration was not saved: {exc}")
+            return
+        if authoring.enabled:
+            authoring.last_status = f"Saved {saved_path.name}"
+            authoring.last_status_ok = True
     
     def _handle_toggle_map(self, event):
         """Handle map toggle."""
@@ -240,7 +303,38 @@ class Application:
         
         # Load objects from config if specified
         if self.cfg.load_from_config:
-            scene_objects = self.simulator.load_objects_from_config(id_handle_dict)
+            if self.state_manager.authoring.enabled:
+                scene_objects, metadata = self.simulator.load_objects_from_config(
+                    id_handle_dict,
+                    include_metadata=True,
+                )
+                anchors = {
+                    int(semantic_id): AnchorInfo.from_mapping(anchor)
+                    for semantic_id, anchor in metadata.items()
+                }
+                self.state_manager.authoring.anchors = dict(anchors)
+                self.state_manager.authoring.baseline_anchors = dict(anchors)
+                self.state_manager.authoring.baseline_semantic_ids = {
+                    int(obj.semantic_id) for obj in scene_objects
+                }
+                baseline_result = validate_authoring_layout(
+                    targets=self.state_manager.authoring.targets,
+                    object_semantic_ids=[
+                        int(obj.semantic_id) for obj in scene_objects
+                    ],
+                    anchors=anchors,
+                    layout_type="static",
+                    minimum_placed=self.state_manager.authoring.minimum_placed,
+                )
+                if not baseline_result.valid:
+                    raise ValueError(
+                        "Invalid authored static baseline: "
+                        + baseline_result.message
+                    )
+            else:
+                scene_objects = self.simulator.load_objects_from_config(
+                    id_handle_dict
+                )
             self.state_manager.objects.all_rigid_objects.extend(scene_objects)
     
     def _setup_placeable_bboxes(self):
@@ -336,4 +430,3 @@ class Application:
             self.ros_adapter.shutdown()
         
         print("Application closed")
-

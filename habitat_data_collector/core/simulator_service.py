@@ -4,7 +4,7 @@ import json
 import os
 import random
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 import habitat_sim
 import magnum as mn
 import numpy as np
@@ -17,6 +17,7 @@ from ..config.settings import (
 )
 from ..utils.coordinate_transform import CoordinateTransform
 from ..utils.topdown_map import shrink_false_areas, check_valid_in_topdown
+from ..authoring import target_template_handles, targets_from_config
 
 
 class SimulatorService:
@@ -213,6 +214,32 @@ class SimulatorService:
         
         file_obj_handles = obj_attr_mgr.get_file_template_handles()
         id_handle_dict = {}
+
+        authoring_cfg = self.cfg.get("authoring")
+        if authoring_cfg and bool(authoring_cfg.get("enabled", False)):
+            targets = targets_from_config(authoring_cfg.targets)
+            try:
+                resolved_handles = target_template_handles(
+                    file_obj_handles,
+                    targets,
+                )
+            except ValueError as exc:
+                raise RuntimeError(str(exc)) from exc
+
+            for target in targets:
+                key_element = target.handle
+                semantic_id = target.semantic_id
+                obj_template = obj_attr_mgr.get_template_by_handle(
+                    resolved_handles[semantic_id]
+                )
+                obj_template.semantic_id = semantic_id
+                obj_attr_mgr.register_template(obj_template, key_element)
+                id_handle_dict[semantic_id] = key_element
+                print(
+                    f"Registered authoring target {key_element} "
+                    f"with semantic ID: {semantic_id}"
+                )
+            return id_handle_dict
         
         # Load existing mappings if from config
         config_data = {}
@@ -239,7 +266,27 @@ class SimulatorService:
         
         return id_handle_dict
     
-    def load_objects_from_config(self, id_handle_dict: Dict[int, str]) -> List:
+    def add_object_with_pose(
+        self,
+        handle: str,
+        translation: List[float],
+        rotation: List[float],
+    ):
+        """Add an object using a serialized Habitat pose."""
+        rigid_object = self.get_rigid_object_manager().add_object_by_template_handle(
+            handle
+        )
+        rigid_object.translation = mn.Vector3(*translation)
+        rigid_object.rotation = mn.Quaternion(
+            mn.Vector3(rotation[:3]), rotation[3]
+        )
+        return rigid_object
+
+    def load_objects_from_config(
+        self,
+        id_handle_dict: Dict[int, str],
+        include_metadata: bool = False,
+    ) -> Union[List, Tuple[List, Dict[int, Dict[str, Any]]]]:
         """Load objects from scene configuration file.
         
         Args:
@@ -252,25 +299,27 @@ class SimulatorService:
             config_data = json.load(file)
         
         objects_info = config_data.get("objects", [])
-        rigid_obj_mgr = self.get_rigid_object_manager()
         added_objects = []
+        object_metadata: Dict[int, Dict[str, Any]] = {}
         
         for obj_data in objects_info:
             semantic_id = obj_data["semantic_id"]
             handle = id_handle_dict.get(semantic_id)
             
             if handle:
-                rigid_object = rigid_obj_mgr.add_object_by_template_handle(handle)
-                rigid_object.translation = mn.Vector3(*obj_data["translation"])
-                
-                rotation_vector = mn.Vector3(obj_data["rotation"][:3])
-                rotation_scalar = obj_data["rotation"][3]
-                rigid_object.rotation = mn.Quaternion(rotation_vector, rotation_scalar)
+                rigid_object = self.add_object_with_pose(
+                    handle,
+                    obj_data["translation"],
+                    obj_data["rotation"],
+                )
                 
                 added_objects.append(rigid_object)
+                if isinstance(obj_data.get("anchor"), dict):
+                    object_metadata[semantic_id] = obj_data["anchor"]
                 print(f"Added object with ID {rigid_object.object_id}, Semantic ID {semantic_id}")
             else:
                 print(f"Warning: Semantic ID {semantic_id} does not have a matching handle.")
         
+        if include_metadata:
+            return added_objects, object_metadata
         return added_objects
-

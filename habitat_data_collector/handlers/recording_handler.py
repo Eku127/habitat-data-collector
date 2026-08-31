@@ -24,6 +24,11 @@ class RecordingHandler(BaseHandler):
     
     def handle_start_recording(self, event: Event):
         """Handle recording start."""
+        if self.state.authoring.enabled:
+            self.state.authoring.last_status = "Recording is disabled in authoring mode."
+            self.state.authoring.last_status_ok = False
+            print(self.state.authoring.last_status)
+            return
         if self.state.app.recording:
             return  # Already recording
         
@@ -125,4 +130,3 @@ class RecordingHandler(BaseHandler):
             )
         
         self.state.recording.actions.append(action_record)
-

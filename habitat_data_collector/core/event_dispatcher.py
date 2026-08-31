@@ -24,6 +24,9 @@ class EventType(Enum):
     OBJECT_ADD = auto()
     OBJECT_REMOVE = auto()
     OBJECT_PLACE_IN_VIEW = auto()
+    OBJECT_SELECT = auto()
+    OBJECT_RELOCATE = auto()
+    OBJECT_UNDO = auto()
     OBJECT_GRAB = auto()
     OBJECT_RELEASE = auto()
     
@@ -86,4 +89,3 @@ class EventDispatcher:
         if event.event_type in self._handlers:
             for handler in self._handlers[event.event_type]:
                 handler(event)
-
