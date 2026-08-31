@@ -186,6 +186,21 @@ Once sourced, the simulator will publish data to ROS2 topics. You can record the
 
 The guide includes visual previews and terminal output samples for better understanding.
 
+### DualMap Scene Layout Authoring
+
+To author DualMap-style static and dynamic object layouts, see the
+[authoring mode guide](documents/dualmap_authoring/README.md) for the
+interactive workflow, or
+[automated dataset authoring](documents/dualmap_authoring/automated_dataset.md)
+to generate whole multi-scene datasets headlessly:
+
+```bash
+xvfb-run -a python scripts/auto_dualmap_authoring.py --split val scan \
+  --report outputs/dualmap_authoring/scan_val.json
+xvfb-run -a python scripts/auto_dualmap_authoring.py --split val build \
+  --from-scan outputs/dualmap_authoring/scan_val.json --count 15
+```
+
 
 ## 📁 Project Structure
 
