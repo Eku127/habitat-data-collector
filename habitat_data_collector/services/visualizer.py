@@ -67,6 +67,9 @@ class Visualizer:
         
         # Add recording indicator
         self._add_recording_indicator(rgb_img_cv, state_manager.app.recording)
+
+        if state_manager.authoring.enabled:
+            self._add_authoring_overlay(rgb_img_cv, state_manager)
         
         # Show window
         cv2.imshow("Habitat Data Collector", rgb_img_cv)
@@ -211,6 +214,81 @@ arrows:   Turn/look
             rgb_img, rec_text, rec_position,
             cv2.FONT_HERSHEY_SIMPLEX, 1, rec_color, 2, cv2.LINE_AA
         )
+
+    def _add_authoring_overlay(self, rgb_img: np.ndarray, state_manager):
+        """Show persistent target, progress, and validation authoring status."""
+        authoring = state_manager.authoring
+        selected = authoring.selected_target
+        present_ids = {
+            int(obj.semantic_id)
+            for obj in state_manager.objects.all_rigid_objects
+        }
+        target_ids = {target.semantic_id for target in authoring.targets}
+        missing = [
+            target.handle
+            for target in authoring.targets
+            if target.semantic_id not in present_ids
+        ]
+        slot = authoring.layout_type
+        if authoring.layout_index is not None:
+            slot += f" #{authoring.layout_index}"
+        selected_text = (
+            "none"
+            if selected is None
+            else f"[{selected.key}/{len(authoring.targets)}] {selected.handle}"
+        )
+        placed_count = len(present_ids & target_ids)
+        if authoring.layout_type == "static":
+            required_ids = present_ids & target_ids
+        else:
+            required_ids = authoring.baseline_semantic_ids
+        relocated_count = len(authoring.relocated_semantic_ids & required_ids)
+        relocation_text = (
+            "n/a"
+            if authoring.layout_type == "static"
+            else f"{relocated_count}/{len(required_ids)}"
+        )
+        lines = [
+            f"AUTHORING: {slot}",
+            f"Selected: {selected_text}",
+            f"Placed: {placed_count}/{len(target_ids)} (min {authoring.minimum_placed}) "
+            f"| Relocated: {relocation_text}",
+            "Not placed: " + (", ".join(missing) if missing else "none"),
+            "1-8 select | p place | v relocate | - delete | u undo | e save",
+            authoring.last_status,
+        ]
+
+        x_start = max(20, rgb_img.shape[1] // 2 - 390)
+        y_start = 30
+        width = min(780, rgb_img.shape[1] - x_start - 20)
+        height = 28 * len(lines) + 16
+        overlay = rgb_img.copy()
+        cv2.rectangle(
+            overlay,
+            (x_start - 10, y_start - 23),
+            (x_start + width, y_start - 23 + height),
+            (0, 0, 0),
+            -1,
+        )
+        cv2.addWeighted(overlay, 0.65, rgb_img, 0.35, 0, rgb_img)
+
+        for index, line in enumerate(lines):
+            color = (255, 255, 255)
+            if index == len(lines) - 1:
+                if authoring.last_status_ok is True:
+                    color = (80, 220, 80)
+                elif authoring.last_status_ok is False:
+                    color = (80, 80, 255)
+            cv2.putText(
+                rgb_img,
+                line[:110],
+                (x_start, y_start + index * 28),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.55,
+                color,
+                1,
+                cv2.LINE_AA,
+            )
     
     def prepare_topdown_map(self, state_manager, object_positions: Optional[List] = None) -> Optional[np.ndarray]:
         """Prepare topdown map with annotations.
@@ -258,4 +336,3 @@ arrows:   Turn/look
             goal_position=nav_goal_topdown,
             nav_path=nav_path_topdown,
         )
-

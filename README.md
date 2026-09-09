@@ -113,6 +113,26 @@ docker exec -it <name-of-container> bash
 
 Before running the tool, please follow the [dataset setup guide](documents/dataset/dataset.md) to prepare the required datasets.
 
+For a Docker-based HM3D setup, copy `.env.example` to `.env`, add your
+Matterport API token, and run:
+
+```bash
+# Installs the non-008xx training scenes and the validation scenes.
+scripts/download_hm3d.sh train val
+
+# Discover and launch any installed scene.
+scripts/list_hm3d_scenes.sh train
+scripts/run_hm3d.sh 00006-HkseAnWCgqk train
+
+# Optional, but required by the add/grab/place object controls.
+scripts/download_ycb.sh
+```
+
+The launcher accepts either the full scene-folder name or its Matterport hash.
+Run `scripts/download_hm3d.sh minival` for a much smaller 10-scene smoke-test
+installation. Credentials in `.env` and all data under `data/` are ignored by
+Git.
+
 
 ## ⚙️ Configuration Guide
 
@@ -165,6 +185,35 @@ Once sourced, the simulator will publish data to ROS2 topics. You can record the
 - Save and reload a scene configuration
 
 The guide includes visual previews and terminal output samples for better understanding.
+
+### DualMap Scene Layout Authoring
+
+To author DualMap-style static and dynamic object layouts, see the
+[authoring mode guide](documents/dualmap_authoring/README.md) for the
+interactive workflow, or
+[automated dataset authoring](documents/dualmap_authoring/automated_dataset.md)
+to generate whole multi-scene datasets headlessly:
+
+```bash
+xvfb-run -a python scripts/auto_dualmap_authoring.py --split val scan \
+  --report outputs/dualmap_authoring/scan_val.json
+xvfb-run -a python scripts/auto_dualmap_authoring.py --split val build \
+  --from-scan outputs/dualmap_authoring/scan_val.json \
+  --count 15 --multifloor-count 5
+```
+
+Each scene gets three layouts — a static baseline, one in-anchor layout (every
+object moved, same surface) and one cross-anchor layout (every object moved to a
+different surface); pass `--layouts-per-kind 3` for the seven-layout structure
+the released DualMap data ships. Multi-storey scenes spread the static layout
+over two floors and move one to three objects between them in the cross-anchor
+layout. Every placement in the staged dataset is shown in
+[the dataset review document](documents/dualmap_authoring/dataset_review.md),
+so layouts can be judged without opening Habitat:
+
+```bash
+python scripts/report_dualmap_dataset.py
+```
 
 
 ## 📁 Project Structure

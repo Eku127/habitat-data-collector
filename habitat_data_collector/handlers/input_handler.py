@@ -51,6 +51,37 @@ class InputHandler(BaseHandler):
             return False
         
         timestamp = time.time()
+
+        if self.state.authoring.enabled:
+            max_target_key = min(len(self.state.authoring.targets), 9)
+            if ord("1") <= k < ord("1") + max_target_key:
+                event = Event(
+                    event_type=EventType.OBJECT_SELECT,
+                    timestamp=timestamp,
+                    data={"index": k - ord("1")},
+                )
+                self.events.dispatch(event)
+                return True
+
+            authoring_actions = {
+                ord("v"): EventType.OBJECT_RELOCATE,
+                ord("u"): EventType.OBJECT_UNDO,
+            }
+            if k in authoring_actions:
+                self.events.dispatch(Event(
+                    event_type=authoring_actions[k],
+                    timestamp=timestamp,
+                ))
+                return True
+
+            if k in (ord("="), ord("g"), ord("r"), ord(" ")):
+                self.state.authoring.last_status = (
+                    "Random add, grab/release, and recording are disabled "
+                    "in authoring mode."
+                )
+                self.state.authoring.last_status_ok = False
+                print(self.state.authoring.last_status)
+                return True
         
         # Check for movement/action keys
         if k in self.KEY_MAPPINGS:
@@ -83,4 +114,3 @@ class InputHandler(BaseHandler):
             return True
         
         return False
-

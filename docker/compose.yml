@@ -11,7 +11,7 @@ services:
       - $HOME/.Xauthority:/root/.Xauthority
       - /dev:/dev
     environment:
-      - DISPLAY=${DISPLAY}
+      - DISPLAY=${DISPLAY:-}
       - NVIDIA_DRIVER_CAPABILITIES=all
     deploy:
       resources:

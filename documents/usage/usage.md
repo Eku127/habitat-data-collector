@@ -215,3 +215,82 @@ Object 011_banana released.
 
 > **Note:** Make sure to grab an object before pressing `r`. Otherwise, you’ll receive: `No grabbed object, Please grab object first.`
 
+## DualMap Dataset Authoring
+
+For the complete workflow, validation rules, and troubleshooting guide, see the
+[DualMap HM3D Dataset Authoring Mode README](../dualmap_authoring/README.md).
+To generate a whole dataset headlessly instead, see
+[automated dataset authoring](../dualmap_authoring/automated_dataset.md); every
+placement it produces is listed in
+[the dataset review document](../dualmap_authoring/dataset_review.md).
+
+DualMap authoring is an opt-in mode with the eight YCB choices used by the
+released experiment: cracker box, tomato soup can, banana, pitcher base, bowl,
+toy airplane, master chef can, and mustard bottle. Each static scene must
+contain at
+least six unique
+choices. Run the launcher from `/app` inside the existing container. The split
+defaults to `val`.
+
+Create the static layout first:
+
+```bash
+cd /app
+export DISPLAY=:4  # use the DISPLAY value configured for this container
+scripts/run_dualmap_authoring.sh 00829 static
+```
+
+The scene argument may be the numeric prefix, full scene directory name, or
+Matterport hash. After saving the static layout, create each dynamic slot:
+
+```bash
+scripts/run_dualmap_authoring.sh 00829 in_anchor 1
+scripts/run_dualmap_authoring.sh 00829 cross_anchor 1
+```
+
+Use layout indices `1`, `2`, and `3`. Add `train` or `minival` to select another
+split, and add `--overwrite` only when an existing slot should be replaced.
+
+| Key | Authoring action |
+|-----|------------------|
+| `1`–`8` | Select one YCB target from the fixed menu |
+| `p` | Place the selected missing target on the visible surface nearest the camera center |
+| `v` | Relocate the selected target while preserving it if placement fails |
+| `-` | Delete the selected target |
+| `u` | Undo the last placement, deletion, or relocation |
+| `e` | Validate and save the current layout slot |
+
+The selection keys are: `1` cracker box, `2` tomato soup can, `3` banana,
+`4` pitcher base, `5` bowl, `6` toy airplane, `7` master chef can, and
+`8` mustard bottle.
+
+The static layout may contain any six, seven, or all eight choices, with no
+duplicates. Dynamic layouts begin from that authored static layout and must keep
+exactly the same subset. Every object in the subset must be relocated with `v`;
+delete followed by `p` does not count as a relocation. An `in_anchor` target
+must stay on its original semantic surface, while a `cross_anchor` target must
+move to a different surface. The HUD reports the selected target, unused menu
+choices, relocation progress, and the last save validation result.
+
+Files are staged under:
+
+```text
+/app/outputs/dualmap_authoring/<scene>/
+├── static_scene_config.json
+└── dynamic_scene_config/
+    ├── in_anchor/layout_01.json      # ... layout_03.json if you author three
+    └── cross_anchor/layout_01.json
+```
+
+The launcher takes a layout index of 1, 2 or 3; one of each kind is enough for
+a complete scene, and the staged dataset uses exactly that.
+
+Validate one completed scene or the full staging tree:
+
+```bash
+python scripts/validate_dualmap_authoring.py --scene 00829
+python scripts/validate_dualmap_authoring.py
+```
+
+The validator exits nonzero for missing slots, malformed data, wrong target
+counts, or anchor-rule violations.

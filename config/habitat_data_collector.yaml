@@ -3,7 +3,7 @@ defaults:
 
 # Scene Output Settings
 dataset_name: hm3d
-output_path: /home/eku/workspace/hiemap/data
+output_path: /app/outputs
 scene_name: 00829-QaLdnwvtxbs
 
 # Habitat Setting
@@ -14,11 +14,11 @@ default_agent: 0
 # load from scene config
 # if load from scene config, then we no need define scene path in the following
 load_from_config: false
-scene_config: /home/eku/workspace/dataset/HM3D_collect/00829-QaLdnwvtxbs/dynamic_scene_config/0117.json
+scene_config: /app/outputs/scene_config.json
 
 # HM3D
-scene_path: /home/eku/workspace/dataset/HM3D/val/00829-QaLdnwvtxbs/QaLdnwvtxbs.basis.glb
-scene_dataset_config: /home/eku/workspace/dataset/HM3D/val/hm3d_annotated_basis.scene_dataset_config.json
+scene_path: /app/data/scene_datasets/hm3d/val/00829-QaLdnwvtxbs/QaLdnwvtxbs.basis.glb
+scene_dataset_config: /app/data/scene_datasets/hm3d/hm3d_annotated_basis.scene_dataset_config.json
 
 # MP3D
 # scene_path: /home/eku/workspace/habitat-sim/data/mp3d_example/17DRP5sb8fy/17DRP5sb8fy.glb
@@ -30,7 +30,7 @@ scene_dataset_config: /home/eku/workspace/dataset/HM3D/val/hm3d_annotated_basis.
 
 
 # Object Path
-objects_path: /home/eku/workspace/dataset/objects/new_objects
+objects_path: /app/data/objects/ycb/configs
 
 # Sensor and Camera Settings
 data_cfg:
@@ -67,7 +67,7 @@ placable_categories:
   - stool
 
 # Show the bounding box of all the placable categories
-show_placable_categories: False
+show_placable_categories: true
 
 frame_rate: 30.0
 
@@ -77,9 +77,44 @@ frame_rate: 30.0
 save_mode: action
 
 # Publish ROS2 topics
-use_ros: True
+use_ros: False
 # The recording can also record the rosbag along with the rgbd raw data
-record_rosbag: True
+record_rosbag: False
+
+# DualMap scene-layout authoring. Disabled by default so normal collector
+# controls and output behavior remain unchanged.
+authoring:
+  enabled: false
+  output_root: /app/outputs/dualmap_authoring
+  layout_type: static
+  layout_index: null
+  overwrite: false
+  minimum_placed: 6
+  targets:
+    - key: 1
+      semantic_id: 50001
+      handle: 003_cracker_box
+    - key: 2
+      semantic_id: 50002
+      handle: 005_tomato_soup_can
+    - key: 3
+      semantic_id: 50007
+      handle: 011_banana
+    - key: 4
+      semantic_id: 50003
+      handle: 019_pitcher_base
+    - key: 5
+      semantic_id: 50004
+      handle: 024_bowl
+    - key: 6
+      semantic_id: 50008
+      handle: 072-a_toy_airplane
+    - key: 7
+      semantic_id: 50005
+      handle: 002_master_chef_can
+    - key: 8
+      semantic_id: 50006
+      handle: 006_mustard_bottle
 
 # PLACEHOLDER, for mapping semantic_id to object handle
 # Do not Delete this holder

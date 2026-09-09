@@ -13,6 +13,7 @@ from scipy.spatial.transform import Rotation as R
 from ..config.settings import DEFAULT_SAVE_MODE, ACTION_CODE_MAP, ACTION_CODE_STOP
 from ..core.state_manager import ActionRecord
 from ..utils.coordinate_transform import CoordinateTransform
+from ..authoring import layout_output_path
 
 
 class DataSaver:
@@ -47,7 +48,12 @@ class DataSaver:
         
         print(f"Saved camera intrinsics to {intrinsics_file}")
     
-    def save_scene_config(self, id_handle_dict: Dict, all_rigid_objects: List):
+    def save_scene_config(
+        self,
+        id_handle_dict: Dict,
+        all_rigid_objects: List,
+        authoring_state=None,
+    ):
         """Save scene configuration.
         
         Args:
@@ -69,7 +75,13 @@ class DataSaver:
             'objects': []
         }
         
-        for obj in all_rigid_objects:
+        objects_to_save = all_rigid_objects
+        if authoring_state is not None:
+            objects_to_save = sorted(
+                all_rigid_objects, key=lambda obj: int(obj.semantic_id)
+            )
+
+        for obj in objects_to_save:
             translation_list = [obj.translation.x, obj.translation.y, obj.translation.z]
             rotation_list = [
                 obj.rotation.vector.x,
@@ -78,18 +90,65 @@ class DataSaver:
                 obj.rotation.scalar
             ]
             
-            config_data['objects'].append({
+            object_data = {
                 'object_id': obj.object_id,
                 'translation': translation_list,
                 'rotation': rotation_list,
                 'semantic_id': obj.semantic_id
-            })
-        
-        config_file = self.scene_dir / "scene_config.json"
-        with open(config_file, "w") as file:
-            json.dump(config_data, file, indent=4)
+            }
+            if authoring_state is not None:
+                anchor = authoring_state.anchors.get(int(obj.semantic_id))
+                if anchor is not None:
+                    object_data['anchor'] = anchor.to_dict()
+            config_data['objects'].append(object_data)
+
+        if authoring_state is None:
+            config_file = self.scene_dir / "scene_config.json"
+            with open(config_file, "w") as file:
+                json.dump(config_data, file, indent=4)
+        else:
+            layout_type = authoring_state.layout_type
+            layout_index = authoring_state.layout_index
+            config_data['authoring'] = {
+                'layout_type': layout_type,
+                'layout_index': layout_index,
+                'reference_static_config': (
+                    None
+                    if layout_type == 'static'
+                    else '../../static_scene_config.json'
+                ),
+                'relocated_semantic_ids': sorted(
+                    authoring_state.relocated_semantic_ids
+                ),
+                'minimum_placed': authoring_state.minimum_placed,
+                'placed_target_semantic_ids': sorted(
+                    int(obj.semantic_id) for obj in objects_to_save
+                ),
+            }
+            config_file = layout_output_path(
+                Path(self.cfg.authoring.output_root),
+                str(self.cfg.scene_name),
+                layout_type,
+                layout_index,
+            )
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            if config_file.exists() and not bool(self.cfg.authoring.overwrite):
+                raise FileExistsError(
+                    f"Output already exists: {config_file}. "
+                    "Relaunch with --overwrite to replace it."
+                )
+            temp_file = config_file.with_suffix(config_file.suffix + ".tmp")
+            try:
+                with open(temp_file, "w") as file:
+                    json.dump(config_data, file, indent=4)
+                    file.write("\n")
+                os.replace(temp_file, config_file)
+            finally:
+                if temp_file.exists():
+                    temp_file.unlink()
         
         print(f"Configuration saved to {config_file}")
+        return config_file
     
     def save_observation(self, observations: Dict, timestamp: float, 
                         frame_index: int = None, next_action: str = None):
@@ -290,4 +349,3 @@ class DataSaver:
         rigid_object.rotation = mn.Quaternion(rotation_vector, rotation_scalar)
         
         return rigid_object
-
