@@ -24,7 +24,7 @@ import math
 import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -36,33 +36,29 @@ os.environ.setdefault("HABITAT_SIM_LOG", "quiet")
 import magnum as mn  # noqa: E402
 
 from habitat_data_collector.authoring import (  # noqa: E402
+    discover_layout_slots,
     layout_output_path,
     targets_from_config,
 )
 from habitat_data_collector.auto_authoring import (  # noqa: E402
+    FloorLevel,
     affordance_for,
     anchor_kind,
+    floor_index_for,
     infer_room_type,
 )
 
 from auto_dualmap_authoring import (  # noqa: E402
+    detect_floors,
+    is_upright,
+    is_visible,
     load_config,
+    navigable_floor,
     object_base_y,
     open_simulator,
     region_room_types,
     register_targets,
 )
-
-LAYOUT_SLOTS = (
-    ("static", None),
-    ("in_anchor", 1),
-    ("in_anchor", 2),
-    ("in_anchor", 3),
-    ("cross_anchor", 1),
-    ("cross_anchor", 2),
-    ("cross_anchor", 3),
-)
-
 
 def semantic_index(scene) -> Dict[str, object]:
     return {str(obj.id): obj for obj in scene.objects if obj is not None}
@@ -78,6 +74,9 @@ def check_layout(
     settle_steps: int,
     drift_tolerance: float,
     surface_tolerance: float,
+    levels: Sequence[FloorLevel] = (),
+    max_per_anchor: int = 2,
+    min_separation: float = 0.35,
 ) -> List[str]:
     """Reload one layout and report everything wrong with it."""
 
@@ -140,6 +139,52 @@ def check_layout(
                 f"(base {object_base_y(rigid_object):.2f} vs top {top_y:.2f})"
             )
 
+        # The saved storey is what the review document reports, so check it
+        # against the live navmesh rather than trusting the file.
+        if levels and "floor_index" in anchor:
+            snapped, _ = navigable_floor(
+                sim, [float(v) for v in semantic_object.aabb.center]
+            )
+            if snapped is not None:
+                live_floor = floor_index_for(levels, snapped)
+                if live_floor != int(anchor["floor_index"]):
+                    problems.append(
+                        f"{name}: anchor {anchor_id} is on storey {live_floor} "
+                        f"({snapped:.2f} m), file says {anchor['floor_index']}"
+                    )
+
+    # The review reads these off the renders; check them here so a regression
+    # is caught by a script rather than by a person scrolling 45 contact sheets.
+    for record, rigid_object, _ in loaded:
+        name = id_handle[int(record["semantic_id"])]
+        if not is_upright(rigid_object):
+            problems.append(f"{name}: is tipped over")
+        elif not is_visible(sim, rigid_object):
+            problems.append(f"{name}: not visible from any navigable viewpoint")
+
+    # Crowding is what a reviewer notices before anything else: four objects on
+    # one table, or two close enough to read as a single pile.
+    by_anchor: Dict[str, List[str]] = {}
+    for record, _, _ in loaded:
+        anchor_id = str((record.get("anchor") or {}).get("object_id"))
+        by_anchor.setdefault(anchor_id, []).append(
+            id_handle[int(record["semantic_id"])]
+        )
+    for anchor_id, names in sorted(by_anchor.items()):
+        if len(names) > max_per_anchor:
+            problems.append(
+                f"{len(names)} targets share {anchor_id}: {sorted(names)}"
+            )
+    for index, (record, _, position) in enumerate(loaded):
+        for other_record, _, other_position in loaded[index + 1:]:
+            gap = math.dist(position, other_position)
+            if gap < min_separation:
+                problems.append(
+                    f"{id_handle[int(record['semantic_id'])]} and "
+                    f"{id_handle[int(other_record['semantic_id'])]} are "
+                    f"{gap:.2f} m apart, closer than {min_separation:.2f} m"
+                )
+
     # Then let physics run: a placement that collapses is not usable data.
     for _ in range(settle_steps):
         sim.step_physics(1.0 / 60.0)
@@ -158,6 +203,53 @@ def check_layout(
     return problems
 
 
+def check_storey_rules(
+    static_data: dict,
+    data: dict,
+    layout_type: str,
+    id_handle: Dict[int, str],
+    cross_floor_moves_range: Tuple[int, int],
+) -> List[str]:
+    """Enforce the storey policy the dataset promises.
+
+    In-anchor layouts keep every object on the storey the static layout put it
+    on; cross-anchor layouts of a multi-storey scene move a bounded handful to
+    the other storey.  Reported here rather than in the JSON validator too,
+    because this is the check a reviewer will look for after a rebuild.
+    """
+
+    if layout_type == "static":
+        return []
+    baseline = {
+        int(obj["semantic_id"]): obj.get("anchor", {})
+        for obj in static_data.get("objects", [])
+    }
+    changed = [
+        int(obj["semantic_id"])
+        for obj in data.get("objects", [])
+        if "floor_index" in obj.get("anchor", {})
+        and "floor_index" in baseline.get(int(obj["semantic_id"]), {})
+        and obj["anchor"]["floor_index"]
+        != baseline[int(obj["semantic_id"])]["floor_index"]
+    ]
+    names = [id_handle.get(sid, str(sid)) for sid in sorted(changed)]
+
+    if layout_type == "in_anchor":
+        if changed:
+            return [f"in-anchor layout changed the storey of {names}"]
+        return []
+
+    if not static_data.get("authoring", {}).get("multifloor"):
+        return []
+    low, high = cross_floor_moves_range
+    if not low <= len(changed) <= high:
+        return [
+            f"moves {len(changed)} target(s) to another storey, expected "
+            f"{low}-{high} ({names})"
+        ]
+    return []
+
+
 def verify_scene(
     scene_root: Path,
     split: str,
@@ -166,6 +258,9 @@ def verify_scene(
     settle_steps: int,
     drift_tolerance: float,
     surface_tolerance: float,
+    cross_floor_moves_range: Tuple[int, int] = (1, 3),
+    max_per_anchor: int = 2,
+    min_separation: float = 0.35,
 ) -> List[str]:
     static_path = scene_root / "static_scene_config.json"
     if not static_path.is_file():
@@ -184,13 +279,15 @@ def verify_scene(
         id_handle = register_targets(sim, cfg.objects_path, targets)
         objects_by_id = semantic_index(sim.semantic_scene)
         rooms = region_room_types(sim.semantic_scene)
-        for layout_type, layout_index in LAYOUT_SLOTS:
+        levels = detect_floors(sim)
+        slots = discover_layout_slots(scene_root.parent, scene_root.name)
+        for kind in ("in_anchor", "cross_anchor"):
+            if not any(layout_type == kind for layout_type, _ in slots):
+                problems.append(f"{scene_root.name}: no {kind} layout")
+        for layout_type, layout_index in slots:
             path = layout_output_path(
                 scene_root.parent, scene_root.name, layout_type, layout_index
             )
-            if not path.is_file():
-                problems.append(f"{scene_root.name}: missing {path.name}")
-                continue
             data = json.loads(path.read_text())
             label = (
                 layout_type
@@ -208,6 +305,19 @@ def verify_scene(
                     settle_steps=settle_steps,
                     drift_tolerance=drift_tolerance,
                     surface_tolerance=surface_tolerance,
+                    levels=levels,
+                    max_per_anchor=max_per_anchor,
+                    min_separation=min_separation,
+                )
+            )
+            problems.extend(
+                f"{scene_root.name} {label}: {problem}"
+                for problem in check_storey_rules(
+                    static_data,
+                    data,
+                    layout_type,
+                    id_handle,
+                    cross_floor_moves_range,
                 )
             )
     finally:
@@ -228,6 +338,26 @@ def main() -> int:
     parser.add_argument("--settle-steps", type=int, default=60)
     parser.add_argument("--drift-tolerance", type=float, default=0.05)
     parser.add_argument("--surface-tolerance", type=float, default=0.16)
+    parser.add_argument(
+        "--max-per-anchor",
+        type=int,
+        default=2,
+        help="Most targets allowed to share one surface.",
+    )
+    parser.add_argument(
+        "--min-separation",
+        type=float,
+        default=0.35,
+        help="Closest two targets may be, centre to centre, in metres.",
+    )
+    parser.add_argument(
+        "--cross-floor-moves",
+        type=int,
+        nargs=2,
+        metavar=("MIN", "MAX"),
+        default=(1, 3),
+        help="Storey changes a multifloor cross-anchor layout must have.",
+    )
     args = parser.parse_args()
 
     if not args.root.is_dir():
@@ -254,6 +384,9 @@ def main() -> int:
             settle_steps=args.settle_steps,
             drift_tolerance=args.drift_tolerance,
             surface_tolerance=args.surface_tolerance,
+            cross_floor_moves_range=tuple(args.cross_floor_moves),
+            max_per_anchor=args.max_per_anchor,
+            min_separation=args.min_separation,
         )
         if problems:
             total += len(problems)

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Render authored DualMap layouts so the placements can be reviewed by eye.
 
-Category names only go so far: ``029_plate on shelf`` reads fine but may be a
-plate wedged against a wall or floating off the edge of the surface.  This
+Category names only go so far: ``024_bowl on shelf`` reads fine but may be a
+bowl wedged against a wall or floating off the edge of the surface.  This
 script reloads each layout and renders it:
 
 * one **contact sheet** per layout — a close-up of every placed target, framed
@@ -40,6 +40,7 @@ import magnum as mn  # noqa: E402
 from habitat_sim.utils.common import quat_from_angle_axis  # noqa: E402
 
 from habitat_data_collector.authoring import (  # noqa: E402
+    discover_layout_slots,
     layout_output_path,
     targets_from_config,
 )
@@ -211,13 +212,48 @@ def mark_object(
     return image
 
 
+def fitted_scale(text: str, width: int, scale: float, minimum: float = 0.30) -> float:
+    """Largest font scale at or below ``scale`` that keeps ``text`` on the tile.
+
+    A cross-floor caption carries the surface, the storey, the distance moved
+    and the height change; at a fixed scale the interesting half is the half
+    that falls off the right edge.
+    """
+
+    while scale > minimum:
+        (text_width, _), _ = cv2.getTextSize(text, FONT, scale, 1)
+        if text_width <= width:
+            break
+        scale -= 0.02
+    return scale
+
+
 def label_image(image: np.ndarray, title: str, subtitle: str) -> np.ndarray:
     """Draw a caption bar under one close-up."""
 
     height, width = image.shape[:2]
     bar = np.full((54, width, 3), 32, dtype=np.uint8)
-    cv2.putText(bar, title, (10, 22), FONT, 0.52, (255, 255, 255), 1, cv2.LINE_AA)
-    cv2.putText(bar, subtitle, (10, 43), FONT, 0.46, (140, 220, 140), 1, cv2.LINE_AA)
+    usable = width - 20
+    cv2.putText(
+        bar,
+        title,
+        (10, 22),
+        FONT,
+        fitted_scale(title, usable, 0.52),
+        (255, 255, 255),
+        1,
+        cv2.LINE_AA,
+    )
+    cv2.putText(
+        bar,
+        subtitle,
+        (10, 43),
+        FONT,
+        fitted_scale(subtitle, usable, 0.46),
+        (140, 220, 140),
+        1,
+        cv2.LINE_AA,
+    )
     framed = np.vstack([image, bar])
     return cv2.copyMakeBorder(
         framed, 2, 2, 2, 2, cv2.BORDER_CONSTANT, value=[70, 70, 70]
@@ -257,12 +293,13 @@ def render_layout(
     camera_height: float,
     title: str,
     baseline: Optional[Dict[int, dict]] = None,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, List[Tuple[str, np.ndarray]]]:
     rom = sim.get_rigid_object_manager()
     for handle in list(rom.get_object_handles()):
         rom.remove_object_by_handle(handle)
 
     positions = []
+    floors_of: Dict[int, int] = {}
     object_ids: Dict[int, int] = {}
     for record in data["objects"]:
         rigid_object = rom.add_object_by_template_handle(
@@ -276,45 +313,78 @@ def render_layout(
         rigid_object.motion_type = habitat_sim.physics.MotionType.STATIC
         object_ids[int(record["semantic_id"])] = int(rigid_object.object_id)
         positions.append(record["translation"])
+        floors_of[len(positions) - 1] = int(
+            record.get("anchor", {}).get("floor_index", 0)
+        )
 
     tiles = []
     for record in sorted(data["objects"], key=lambda item: item["semantic_id"]):
         name = id_handle[int(record["semantic_id"])]
         anchor = record["anchor"]
         object_id = object_ids[int(record["semantic_id"])]
-        if not aim_at(sim, agent, record["translation"], camera_height, object_id):
-            continue
+        # A viewpoint that cannot see the object used to skip the tile, so the
+        # object simply vanished from the contact sheet and the review had no
+        # way to tell "fine" from "invisible".  Show the best attempt instead
+        # and say so.
+        seen = aim_at(sim, agent, record["translation"], camera_height, object_id)
         frame = sim.get_sensor_observations()["color_sensor"]
         frame = cv2.cvtColor(np.asarray(frame)[:, :, :3], cv2.COLOR_RGB2BGR)
         frame = mark_object(frame, project_to_screen(sim, record["translation"]))
-        subtitle = f"on {anchor['category']}  [{anchor['object_id']}]"
+        floor = int(anchor.get("floor_index", 0))
+        subtitle = f"on {anchor['object_id']}  F{floor}"
+        if not seen:
+            name = f"{name}   [NOT VISIBLE]"
         if baseline is not None:
             previous = baseline.get(int(record["semantic_id"]))
             if previous is not None:
                 moved = math.dist(record["translation"], previous["translation"])
                 subtitle += f"   moved {moved:.2f} m"
+                was = int(previous.get("anchor", {}).get("floor_index", 0))
+                if was != floor:
+                    delta = record["translation"][1] - previous["translation"][1]
+                    subtitle += f"   F{was}->F{floor} dz {delta:+.2f} m"
         tiles.append(label_image(frame, name, subtitle))
 
     sheet = contact_sheet(tiles)
     sheet = np.vstack([banner(sheet.shape[1], title), sheet])
 
-    floor = float(sim.pathfinder.get_bounds()[0][1])
-    topdown = sim.pathfinder.get_topdown_view(TOPDOWN_METERS_PER_PIXEL, floor)
-    marks = [
-        CoordinateTransform.convert_to_topdown(
-            sim.pathfinder, np.array(position), TOPDOWN_METERS_PER_PIXEL
+    # One map per storey the layout actually uses.  A single slice at the
+    # scene's lowest point would draw an upstairs object onto the ground-floor
+    # navmesh, which is exactly the mistake a review is meant to catch.
+    levels = {
+        int(level["index"]): float(level["height"])
+        for level in data.get("authoring", {}).get("floors", [])
+    }
+    occupied = sorted(set(floors_of.values()))
+    if not levels or not occupied:
+        levels = {0: float(sim.pathfinder.get_bounds()[0][1])}
+        occupied = [0]
+
+    maps: List[Tuple[str, np.ndarray]] = []
+    for floor in occupied:
+        height = levels.get(floor, float(sim.pathfinder.get_bounds()[0][1]))
+        topdown = sim.pathfinder.get_topdown_view(TOPDOWN_METERS_PER_PIXEL, height)
+        marks = [
+            CoordinateTransform.convert_to_topdown(
+                sim.pathfinder, np.array(position), TOPDOWN_METERS_PER_PIXEL
+            )
+            for index, position in enumerate(positions)
+            if floors_of.get(index, 0) == floor
+        ]
+        map_image = render_topdown_map(topdown, object_positions=marks)
+        scale = max(1, int(900 / max(map_image.shape[1], 1)))
+        map_image = cv2.resize(
+            map_image,
+            (map_image.shape[1] * scale, map_image.shape[0] * scale),
+            interpolation=cv2.INTER_NEAREST,
         )
-        for position in positions
-    ]
-    map_image = render_topdown_map(topdown, object_positions=marks)
-    scale = max(1, int(900 / max(map_image.shape[1], 1)))
-    map_image = cv2.resize(
-        map_image,
-        (map_image.shape[1] * scale, map_image.shape[0] * scale),
-        interpolation=cv2.INTER_NEAREST,
-    )
-    map_image = np.vstack([banner(map_image.shape[1], title), map_image])
-    return sheet, map_image
+        caption = f"{title}   floor {floor} ({height:+.2f} m)"
+        if len(occupied) > 1:
+            caption += f"   {len(marks)}/{len(positions)} objects"
+        map_image = np.vstack([banner(map_image.shape[1], caption), map_image])
+        suffix = "" if len(occupied) == 1 else f"_f{floor}"
+        maps.append((suffix, map_image))
+    return sheet, maps
 
 
 def main() -> int:
@@ -362,12 +432,12 @@ def main() -> int:
         camera_height = float(cfg.data_cfg.camera_height)
         baseline = {int(o["semantic_id"]): o for o in static_data["objects"]}
 
-        for layout_type, layout_index in LAYOUT_SLOTS:
+        for layout_type, layout_index in discover_layout_slots(
+            args.root, scene_root.name
+        ):
             path = layout_output_path(
                 args.root, scene_root.name, layout_type, layout_index
             )
-            if not path.is_file():
-                continue
             data = json.loads(path.read_text())
             name = (
                 layout_type
@@ -377,7 +447,7 @@ def main() -> int:
             title = f"{scene_root.name}   {LAYOUT_LABELS.get(layout_type, layout_type)}"
             if layout_index is not None:
                 title += f"  layout {layout_index}"
-            sheet, map_image = render_layout(
+            sheet, maps = render_layout(
                 sim,
                 agent,
                 data,
@@ -386,24 +456,21 @@ def main() -> int:
                 title,
                 baseline=None if layout_type == "static" else baseline,
             )
+            # Stale maps from a previous single-floor render would otherwise be
+            # picked up by the report alongside the new per-floor ones.
+            for stale in out_dir.glob(f"{name}_topdown*.png"):
+                stale.unlink()
             cv2.imwrite(str(out_dir / f"{name}_objects.png"), sheet)
-            cv2.imwrite(str(out_dir / f"{name}_topdown.png"), map_image)
-            print(f"wrote {name}_objects.png and {name}_topdown.png")
+            for suffix, map_image in maps:
+                cv2.imwrite(str(out_dir / f"{name}_topdown{suffix}.png"), map_image)
+            print(
+                f"wrote {name}_objects.png and "
+                f"{len(maps)} top-down map(s)"
+            )
     finally:
         sim.close()
     print(f"\nRenders in {out_dir}")
     return 0
-
-
-LAYOUT_SLOTS = (
-    ("static", None),
-    ("in_anchor", 1),
-    ("in_anchor", 2),
-    ("in_anchor", 3),
-    ("cross_anchor", 1),
-    ("cross_anchor", 2),
-    ("cross_anchor", 3),
-)
 
 
 if __name__ == "__main__":

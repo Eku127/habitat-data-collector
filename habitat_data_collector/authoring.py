@@ -6,7 +6,7 @@ import math
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 
 VALID_LAYOUT_TYPES = {"static", "in_anchor", "cross_anchor"}
@@ -22,15 +22,31 @@ class AuthoringTarget:
     handle: str
 
 
+#: The eight YCB targets, and the reserved semantic IDs that identify them.
+#:
+#: The set is chosen so that no two members share a silhouette, because a
+#: detector that cannot tell two targets apart makes the relocation queries
+#: ambiguous.  Four of the original eight have been replaced:
+#:
+#: * ``037_scissors`` and ``025_mug`` were the two smallest objects in the set;
+#:   scissors present a 1.6 cm silhouette edge-on and are missed at any useful
+#:   range.  Replaced by ``006_mustard_bottle`` and ``021_bleach_cleanser``.
+#: * ``029_plate`` read as a second ``024_bowl``, and ``021_bleach_cleanser``
+#:   as a second ``006_mustard_bottle`` -- a flat disc and a tall bottle each
+#:   appearing twice.  Replaced by ``002_master_chef_can`` and
+#:   ``072-a_toy_airplane``.
+#:
+#: The reserved semantic IDs are deliberately unchanged, so the slot an object
+#: occupies is stable even when the object is not.
 DUALMAP_TARGETS = (
     AuthoringTarget(1, 50001, "003_cracker_box"),
     AuthoringTarget(2, 50002, "005_tomato_soup_can"),
     AuthoringTarget(3, 50007, "011_banana"),
     AuthoringTarget(4, 50003, "019_pitcher_base"),
     AuthoringTarget(5, 50004, "024_bowl"),
-    AuthoringTarget(6, 50008, "025_mug"),
-    AuthoringTarget(7, 50005, "029_plate"),
-    AuthoringTarget(8, 50006, "037_scissors"),
+    AuthoringTarget(6, 50008, "072-a_toy_airplane"),
+    AuthoringTarget(7, 50005, "002_master_chef_can"),
+    AuthoringTarget(8, 50006, "006_mustard_bottle"),
 )
 
 
@@ -159,14 +175,64 @@ def layout_output_path(
         if layout_index is not None:
             raise ValueError("Static layouts do not accept a layout index.")
         return scene_root / "static_scene_config.json"
-    if layout_index not in (1, 2, 3):
-        raise ValueError("Dynamic layout index must be 1, 2, or 3.")
+    if not isinstance(layout_index, int) or layout_index < 1:
+        raise ValueError("Dynamic layout index must be a positive integer.")
     return (
         scene_root
         / "dynamic_scene_config"
         / layout_type
         / f"layout_{layout_index:02d}.json"
     )
+
+
+#: The dynamic layout kinds, in review order.  ``static`` is the baseline the
+#: two dynamic kinds are measured against, so it always comes first.
+DYNAMIC_LAYOUT_TYPES: Tuple[str, ...] = ("in_anchor", "cross_anchor")
+
+
+def layout_slots(
+    per_kind: int = 1,
+) -> Tuple[Tuple[str, Optional[int]], ...]:
+    """The layout slots of a scene: one static plus ``per_kind`` of each kind."""
+
+    if per_kind < 1:
+        raise ValueError("A scene needs at least one layout of each kind.")
+    slots: List[Tuple[str, Optional[int]]] = [("static", None)]
+    for layout_type in DYNAMIC_LAYOUT_TYPES:
+        slots.extend((layout_type, index) for index in range(1, per_kind + 1))
+    return tuple(slots)
+
+
+def discover_layout_slots(
+    output_root: Path,
+    scene_name: str,
+) -> Tuple[Tuple[str, Optional[int]], ...]:
+    """The layout slots actually present for one authored scene.
+
+    The number of dynamic layouts per kind is a property of the dataset, not of
+    the code, so the review, render and verification tools read what is on disk
+    instead of assuming a count.  Indices are taken in order from 01 and stop at
+    the first gap, so a half-written scene reports what it really has.
+    """
+
+    scene_root = Path(output_root) / scene_name
+    slots: List[Tuple[str, Optional[int]]] = []
+    if (scene_root / "static_scene_config.json").is_file():
+        slots.append(("static", None))
+    for layout_type in DYNAMIC_LAYOUT_TYPES:
+        index = 1
+        while layout_output_path(output_root, scene_name, layout_type, index).is_file():
+            slots.append((layout_type, index))
+            index += 1
+    return tuple(slots)
+
+
+def slot_name(layout_type: str, layout_index: Optional[int]) -> str:
+    """``("in_anchor", 2)`` -> ``"in_anchor_02"``."""
+
+    if layout_index is None:
+        return layout_type
+    return f"{layout_type}_{layout_index:02d}"
 
 
 def validate_authoring_layout(

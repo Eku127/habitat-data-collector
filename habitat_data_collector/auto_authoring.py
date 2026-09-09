@@ -283,27 +283,31 @@ TARGET_AFFORDANCES: Dict[str, TargetAffordance] = {
         rooms=_FOOD_ROOMS,
         preferred_rooms=("kitchen", "dining_room"),
     ),
-    "025_mug": TargetAffordance(
-        "025_mug",
-        anchor_kinds=("counter", "island", "dining_table", "table",
-                      "coffee_table", "desk", "nightstand", "sideboard",
-                      "shelf", "cabinet", "tv_stand"),
-        rooms=_FOOD_ROOMS + ("office", "bedroom"),
-        preferred_rooms=("kitchen", "office", "living_room"),
+    # A toy, and the only target that is not kitchen goods.  It belongs where
+    # people keep and play with things -- a living room shelf, a bedroom chest,
+    # a desk -- and not on a kitchen counter or a laid dining table.  That
+    # deliberately pulls one target out of the kitchen in every scene, which
+    # spreads the layout instead of piling everything onto the worktop.
+    "072-a_toy_airplane": TargetAffordance(
+        "072-a_toy_airplane",
+        anchor_kinds=("table", "coffee_table", "desk", "shelf", "cabinet",
+                      "chest", "nightstand", "tv_stand", "sideboard"),
+        rooms=("living_room", "bedroom", "office"),
+        preferred_rooms=("living_room", "bedroom"),
     ),
-    "029_plate": TargetAffordance(
-        "029_plate",
+    "002_master_chef_can": TargetAffordance(
+        "002_master_chef_can",
         anchor_kinds=_FOOD_PREP_SURFACES,
         rooms=_FOOD_ROOMS,
         preferred_rooms=("kitchen", "dining_room"),
     ),
-    "037_scissors": TargetAffordance(
-        "037_scissors",
-        anchor_kinds=("desk", "table", "counter", "island", "coffee_table",
-                      "sideboard", "shelf", "cabinet", "chest", "nightstand",
-                      "tv_stand"),
-        rooms=("kitchen", "dining_room", "living_room", "office", "bedroom"),
-        preferred_rooms=("office", "kitchen"),
+    # A condiment: the same reach as the other food items, and at home on a
+    # dining table in a way the scissors it replaced never were.
+    "006_mustard_bottle": TargetAffordance(
+        "006_mustard_bottle",
+        anchor_kinds=_FOOD_PREP_SURFACES,
+        rooms=_FOOD_ROOMS,
+        preferred_rooms=("kitchen", "dining_room"),
     ),
 }
 
@@ -319,6 +323,123 @@ def affordance_for(handle: str) -> TargetAffordance:
             anchor_kinds=_FOOD_PREP_SURFACES,
             rooms=_FOOD_ROOMS + ("office", "bedroom"),
         )
+
+
+# ---------------------------------------------------------------------------
+# Storeys
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class FloorLevel:
+    """One storey of a scene, derived from the navigable heights."""
+
+    index: int
+    #: Representative navigable height, the mean of the cluster.
+    height: float
+    y_min: float
+    y_max: float
+    #: Fraction of the navmesh that sits on this storey.
+    share: float
+
+    def contains(self, y: float, tolerance: float = 0.6) -> bool:
+        return self.y_min - tolerance <= y <= self.y_max + tolerance
+
+
+def cluster_floor_levels(
+    heights: Sequence[float],
+    weights: Optional[Sequence[float]] = None,
+    *,
+    min_gap: float = 1.3,
+    min_share: float = 0.04,
+    bin_share: float = 0.01,
+    bin_size: float = 0.10,
+) -> List[FloorLevel]:
+    """Group navigable heights into storeys.
+
+    HM3D scenes carry no storey annotation, so the storeys are read off the
+    navmesh: a house has navigable area concentrated at a few heights.
+
+    Simply merging neighbouring heights does not work, because a staircase is
+    navigable at *every* height in between and chains the storeys into one
+    cluster.  Instead the histogram is thresholded first: a bin holding less
+    than ``bin_share`` of the navigable area is a stair tread, not a floor, and
+    acts as a separator.  ``weights`` should therefore be navmesh triangle
+    areas -- vertex counts describe boundary detail, not area, and a large open
+    floor may have fewer vertices than a cluttered landing.
+
+    Returns at least one level whenever ``heights`` is non-empty, ordered from
+    the lowest storey up, so callers never have to special-case a flat scene.
+    """
+
+    samples = [
+        (float(height), float(weight))
+        for height, weight in zip(
+            heights,
+            weights if weights is not None else [1.0] * len(heights),
+        )
+        if math.isfinite(float(height)) and math.isfinite(float(weight))
+    ]
+    if not samples:
+        return []
+
+    buckets: Dict[int, List[Tuple[float, float]]] = {}
+    for height, weight in samples:
+        buckets.setdefault(int(math.floor(height / bin_size)), []).append(
+            (height, weight)
+        )
+
+    total = sum(weight for _, weight in samples) or 1.0
+    dense = [
+        key
+        for key in sorted(buckets)
+        if sum(weight for _, weight in buckets[key]) / total >= bin_share
+    ]
+    if not dense:
+        dense = [max(buckets, key=lambda key: sum(w for _, w in buckets[key]))]
+
+    groups: List[List[int]] = [[dense[0]]]
+    for key in dense[1:]:
+        if (key - groups[-1][-1]) * bin_size <= min_gap:
+            groups[-1].append(key)
+        else:
+            groups.append([key])
+
+    levels: List[Tuple[float, float, float, float]] = []
+    for group in groups:
+        entries = [entry for key in group for entry in buckets[key]]
+        mass = sum(weight for _, weight in entries)
+        if mass / total < min_share:
+            continue
+        centre = sum(h * w for h, w in entries) / mass
+        levels.append(
+            (centre, min(h for h, _ in entries), max(h for h, _ in entries), mass / total)
+        )
+
+    if not levels:
+        entries = [entry for key in max(groups, key=len) for entry in buckets[key]]
+        mass = sum(weight for _, weight in entries) or 1.0
+        levels = [
+            (
+                sum(h * w for h, w in entries) / mass,
+                min(h for h, _ in entries),
+                max(h for h, _ in entries),
+                1.0,
+            )
+        ]
+
+    return [
+        FloorLevel(index=index, height=centre, y_min=low, y_max=high, share=share)
+        for index, (centre, low, high, share) in enumerate(levels)
+    ]
+
+
+def floor_index_for(floors: Sequence[FloorLevel], y: float) -> int:
+    """Storey whose navigable height is closest to ``y``."""
+
+    if not floors:
+        return 0
+    return min(floors, key=lambda floor: abs(floor.height - y)).index
 
 
 # ---------------------------------------------------------------------------
@@ -338,6 +459,10 @@ class AnchorCandidate:
     region_id: str
     room: str
     navigable: bool = True
+    #: Index of the storey this anchor stands on, 0 for the lowest.
+    floor_index: int = 0
+    #: Navigable height of that storey, used for the reachability test.
+    floor_height: float = 0.0
 
     @property
     def top_y(self) -> float:
@@ -417,6 +542,42 @@ def allowed_anchors(
     return allowed
 
 
+def floors_by_anchor_count(
+    candidates: Sequence[AnchorCandidate],
+) -> List[Tuple[int, int]]:
+    """``(floor_index, usable anchor count)`` pairs, densest storey first."""
+
+    counts: Dict[int, int] = {}
+    for candidate in candidates:
+        counts[candidate.floor_index] = counts.get(candidate.floor_index, 0) + 1
+    return sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+
+
+def restrict_to_floors(
+    candidates: Sequence[AnchorCandidate],
+    *,
+    max_floors: int = 1,
+    min_anchors: int = 3,
+) -> List[AnchorCandidate]:
+    """Keep the anchors on the ``max_floors`` densest storeys.
+
+    One storey is the default: it keeps a single recording trajectory viable.
+    A multi-storey dataset asks for two, and a storey with almost no usable
+    anchors is not worth walking upstairs for, hence ``min_anchors``.
+    """
+
+    if not candidates:
+        return []
+    ranked = floors_by_anchor_count(candidates)
+    chosen = {floor for floor, count in ranked[:1]}
+    for floor, count in ranked[1:max_floors]:
+        if count >= min_anchors:
+            chosen.add(floor)
+    return [
+        candidate for candidate in candidates if candidate.floor_index in chosen
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Layout planning
 # ---------------------------------------------------------------------------
@@ -441,11 +602,20 @@ def plan_static_layout(
     minimum_placed: int = 6,
     maximum_placed: int = 8,
     max_per_anchor: int = 2,
+    floor_quota: Optional[Mapping[int, int]] = None,
+    min_per_floor: int = 2,
 ) -> LayoutPlan:
     """Assign as many targets as possible to semantically valid anchors.
 
     Targets with the fewest valid anchors are assigned first so that a scarce
     anchor is not consumed by a target that had alternatives.
+
+    ``floor_quota`` maps a storey index to the number of targets that should
+    land on it.  A multi-storey scene passes one so the static layout actually
+    spreads over both floors instead of collapsing onto whichever storey scores
+    best; the plan is rejected if any quota floor ends up with fewer than
+    ``min_per_floor`` targets, since a single object upstairs is not enough to
+    exercise a cross-floor query.
     """
 
     options = {
@@ -459,6 +629,7 @@ def plan_static_layout(
     plan = LayoutPlan()
     used: Dict[str, int] = {}
     used_regions: Dict[str, int] = {}
+    remaining = dict(floor_quota) if floor_quota else {}
 
     for target in order:
         if len(plan.assignments) >= maximum_placed:
@@ -470,24 +641,86 @@ def plan_static_layout(
         ]
         if not choices:
             continue
+        if remaining:
+            # Prefer a storey that still owes targets, but never drop a target
+            # only because its affordable anchors all sit on a filled floor.
+            hungry = [
+                candidate
+                for candidate in choices
+                if remaining.get(candidate.floor_index, 0) > 0
+            ]
+            choices = hungry or choices
         affordance = affordance_for(target.handle)
         best = max(
             choices,
             key=lambda candidate: (
                 candidate_score(candidate, affordance)
                 # Spread objects over anchors and rooms before doubling up.
-                - 1.5 * used.get(candidate.object_id, 0)
-                - 0.4 * used_regions.get(candidate.region_id, 0)
+                # Eight targets on one worktop is a scene where nothing can be
+                # told apart, so the penalties are heavier than the score.
+                - 4.0 * used.get(candidate.object_id, 0)
+                - 1.2 * used_regions.get(candidate.region_id, 0)
                 + rng.random() * 0.25
             ),
         )
         plan.assignments[target.semantic_id] = best
         used[best.object_id] = used.get(best.object_id, 0) + 1
         used_regions[best.region_id] = used_regions.get(best.region_id, 0) + 1
+        if best.floor_index in remaining:
+            remaining[best.floor_index] -= 1
 
     if len(plan.assignments) < minimum_placed:
         return LayoutPlan()
+    if floor_quota:
+        occupancy = floor_occupancy(plan.assignments)
+        if any(
+            occupancy.get(floor, 0) < min_per_floor for floor in floor_quota
+        ):
+            return LayoutPlan()
     return plan
+
+
+def spread_limit(
+    candidates: Sequence[AnchorCandidate],
+    target_count: int,
+) -> int:
+    """How many targets may share one surface.
+
+    One each is what a reviewer wants -- eight objects on a single worktop is a
+    scene where nothing can be told apart -- but a scene with barely more
+    anchors than targets cannot honour that, and losing the scene is worse than
+    doubling up on one surface.
+    """
+
+    distinct = len({candidate.object_id for candidate in candidates})
+    return 1 if distinct >= 2 * max(target_count, 1) else 2
+
+
+def floor_occupancy(
+    assignments: Mapping[int, AnchorCandidate],
+) -> Dict[int, int]:
+    """How many targets sit on each storey."""
+
+    counts: Dict[int, int] = {}
+    for anchor in assignments.values():
+        counts[anchor.floor_index] = counts.get(anchor.floor_index, 0) + 1
+    return counts
+
+
+def balanced_floor_quota(
+    floors: Sequence[int],
+    total: int,
+) -> Dict[int, int]:
+    """Split ``total`` targets as evenly as possible over ``floors``."""
+
+    ordered = sorted(set(floors))
+    if not ordered:
+        return {}
+    base, extra = divmod(total, len(ordered))
+    return {
+        floor: base + (1 if position < extra else 0)
+        for position, floor in enumerate(ordered)
+    }
 
 
 def plan_cross_anchor_layout(
@@ -499,16 +732,39 @@ def plan_cross_anchor_layout(
     max_per_anchor: int = 2,
     min_move_distance: float = 1.0,
     avoid: Sequence[Mapping[int, AnchorCandidate]] = (),
+    cross_floor_quota: int = 0,
 ) -> LayoutPlan:
     """Move every target onto a different but still sensible anchor.
 
     ``avoid`` holds anchor assignments from sibling layouts so the three
     cross-anchor layouts of a scene do not collapse onto the same answer.
+
+    ``cross_floor_quota`` is how many targets should end up on a *different
+    storey* than the static layout put them on.  In a multi-storey scene a
+    handful of deliberate floor changes is what makes the benchmark test
+    vertical re-localisation; moving everything upstairs would instead just be
+    a second scene.  The rest of the targets are pushed to stay on their own
+    storey, so the count is exact and reviewable.
     """
 
     plan = LayoutPlan()
     used: Dict[str, int] = {}
     order = sorted(baseline, key=lambda sid: len(allowed_anchors(candidates, handles[sid])))
+
+    movers = (
+        select_cross_floor_movers(
+            baseline,
+            handles,
+            candidates,
+            rng,
+            quota=cross_floor_quota,
+            avoid=avoid,
+        )
+        if cross_floor_quota > 0
+        else set()
+    )
+    if cross_floor_quota > 0 and not movers:
+        return LayoutPlan()
 
     for semantic_id in order:
         origin = baseline[semantic_id]
@@ -519,6 +775,18 @@ def plan_cross_anchor_layout(
             if candidate.object_id != origin.object_id
             and used.get(candidate.object_id, 0) < max_per_anchor
         ]
+        if semantic_id in movers:
+            off_floor = [
+                candidate
+                for candidate in choices
+                if candidate.floor_index != origin.floor_index
+            ]
+            # ``movers`` was chosen from anchors that were free at selection
+            # time; if this scene's earlier assignments have since consumed
+            # them all, the layout is not the one we promised.
+            if not off_floor:
+                return LayoutPlan()
+            choices = off_floor
         if not choices:
             return LayoutPlan()
         seen = {
@@ -536,7 +804,15 @@ def plan_cross_anchor_layout(
                 score += 1.0
             if candidate.object_id in seen:
                 score -= 2.5
-            score -= 1.5 * used.get(candidate.object_id, 0)
+            score -= 4.0 * used.get(candidate.object_id, 0)
+            if (
+                semantic_id not in movers
+                and candidate.floor_index != origin.floor_index
+            ):
+                # Keep the non-movers downstairs so the floor changes stay a
+                # deliberate, countable signal.  This has to outweigh the
+                # anchor-reuse penalty or crowding pushes targets upstairs.
+                score -= 8.0
             return score + rng.random() * 0.25
 
         best = max(choices, key=rank)
@@ -544,6 +820,65 @@ def plan_cross_anchor_layout(
         used[best.object_id] = used.get(best.object_id, 0) + 1
 
     return plan
+
+
+def select_cross_floor_movers(
+    baseline: Mapping[int, AnchorCandidate],
+    handles: Mapping[int, str],
+    candidates: Sequence[AnchorCandidate],
+    rng: random.Random,
+    *,
+    quota: int,
+    avoid: Sequence[Mapping[int, AnchorCandidate]] = (),
+) -> Set[int]:
+    """Choose which targets change storey, best semantic fit first.
+
+    A target is only eligible if it has an affordable anchor on another floor:
+    a soup can with nothing but a bathroom upstairs stays where it is.  Targets
+    that already crossed in a sibling layout are demoted so the three
+    cross-anchor layouts of a scene do not repeat the same floor change.
+    """
+
+    already = [
+        semantic_id
+        for other in avoid
+        for semantic_id, anchor in other.items()
+        if semantic_id in baseline
+        and anchor.floor_index != baseline[semantic_id].floor_index
+    ]
+    repeats = {semantic_id: already.count(semantic_id) for semantic_id in already}
+
+    ranked: List[Tuple[float, int]] = []
+    for semantic_id, origin in baseline.items():
+        affordance = affordance_for(handles[semantic_id])
+        off_floor = [
+            candidate
+            for candidate in allowed_anchors(candidates, handles[semantic_id])
+            if candidate.floor_index != origin.floor_index
+        ]
+        if not off_floor:
+            continue
+        best = max(candidate_score(c, affordance) for c in off_floor)
+        ranked.append(
+            (best - 1.5 * repeats.get(semantic_id, 0) + rng.random() * 0.5, semantic_id)
+        )
+
+    ranked.sort(reverse=True)
+    return {semantic_id for _, semantic_id in ranked[:quota]}
+
+
+def cross_floor_moves(
+    baseline: Mapping[int, AnchorCandidate],
+    assignments: Mapping[int, AnchorCandidate],
+) -> List[int]:
+    """Semantic IDs whose storey differs from the static layout."""
+
+    return sorted(
+        semantic_id
+        for semantic_id, anchor in assignments.items()
+        if semantic_id in baseline
+        and anchor.floor_index != baseline[semantic_id].floor_index
+    )
 
 
 def describe_plan(

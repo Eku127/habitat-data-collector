@@ -10,10 +10,17 @@ from habitat_data_collector.auto_authoring import (
     allowed_anchors,
     anchor_is_usable,
     anchor_kind,
+    balanced_floor_quota,
+    cluster_floor_levels,
+    cross_floor_moves,
+    floor_index_for,
+    floor_occupancy,
     infer_room_type,
     normalize_category,
     plan_cross_anchor_layout,
     plan_static_layout,
+    restrict_to_floors,
+    select_cross_floor_movers,
 )
 
 
@@ -24,6 +31,7 @@ def anchor(
     region="_1",
     center=(0.0, 0.4, 0.0),
     size=(1.0, 0.8, 1.0),
+    floor=0,
 ):
     return AnchorCandidate(
         object_id=object_id,
@@ -33,6 +41,8 @@ def anchor(
         size=size,
         region_id=region,
         room=room,
+        floor_index=floor,
+        floor_height=floor * 3.0,
     )
 
 
@@ -98,15 +108,48 @@ class AffordanceTest(unittest.TestCase):
     def test_food_never_lands_in_a_bathroom(self):
         for handle in (
             "005_tomato_soup_can",
-            "029_plate",
+            "002_master_chef_can",
             "024_bowl",
             "011_banana",
+            "006_mustard_bottle",
         ):
             self.assertFalse(affordance_for(handle).allows("table", "bathroom"), handle)
 
-    def test_tableware_stays_out_of_bedrooms_but_a_mug_may_stay(self):
-        self.assertFalse(affordance_for("029_plate").allows("table", "bedroom"))
-        self.assertTrue(affordance_for("025_mug").allows("nightstand", "bedroom"))
+    def test_tableware_stays_out_of_bedrooms(self):
+        self.assertFalse(affordance_for("024_bowl").allows("nightstand", "bedroom"))
+        self.assertFalse(
+            affordance_for("002_master_chef_can").allows("table", "bedroom")
+        )
+
+    def test_a_condiment_belongs_wherever_food_is_served(self):
+        mustard = affordance_for("006_mustard_bottle")
+        self.assertTrue(mustard.allows("dining_table", "dining_room"))
+        self.assertTrue(mustard.allows("counter", "kitchen"))
+        self.assertFalse(mustard.allows("nightstand", "bedroom"))
+        self.assertFalse(mustard.allows("table", "bathroom"))
+
+    def test_a_toy_lives_away_from_the_kitchen(self):
+        toy = affordance_for("072-a_toy_airplane")
+        self.assertTrue(toy.allows("shelf", "living_room"))
+        self.assertTrue(toy.allows("chest", "bedroom"))
+        self.assertTrue(toy.allows("desk", "office"))
+        # Not where food is prepared or served.
+        self.assertFalse(toy.allows("counter", "kitchen"))
+        self.assertFalse(toy.allows("dining_table", "dining_room"))
+
+    def test_no_two_targets_share_a_room_and_surface_profile(self):
+        """The set is chosen so the targets are not interchangeable."""
+        profiles = {
+            target.handle: (
+                frozenset(affordance_for(target.handle).anchor_kinds),
+                frozenset(affordance_for(target.handle).rooms),
+            )
+            for target in DUALMAP_TARGETS
+        }
+        self.assertNotEqual(profiles["072-a_toy_airplane"], profiles["024_bowl"])
+        self.assertNotEqual(
+            profiles["072-a_toy_airplane"], profiles["006_mustard_bottle"]
+        )
 
     def test_unknown_rooms_are_allowed_when_the_surface_fits(self):
         self.assertTrue(affordance_for("024_bowl").allows("counter", ROOM_UNKNOWN))
@@ -200,6 +243,206 @@ class PlanningTest(unittest.TestCase):
         ranked = allowed_anchors(self.candidates, "005_tomato_soup_can")
         self.assertTrue(ranked)
         self.assertEqual(ranked[0].room, "kitchen")
+
+
+class FloorClusteringTest(unittest.TestCase):
+    """The navmesh heights of a two-storey house, with a staircase between."""
+
+    def two_storey(self):
+        heights = [0.0, 3.1]
+        areas = [60.0, 40.0]
+        for step in range(12):
+            heights.append(0.3 + 0.25 * step)
+            areas.append(0.4)
+        return heights, areas
+
+    def test_a_staircase_does_not_merge_two_storeys(self):
+        levels = cluster_floor_levels(*self.two_storey())
+        self.assertEqual(len(levels), 2)
+        self.assertAlmostEqual(levels[0].height, 0.0, places=2)
+        self.assertAlmostEqual(levels[1].height, 3.1, places=2)
+
+    def test_levels_are_ordered_from_the_ground_up(self):
+        levels = cluster_floor_levels(*self.two_storey())
+        self.assertEqual([level.index for level in levels], [0, 1])
+        self.assertLess(levels[0].height, levels[1].height)
+
+    def test_a_flat_scene_is_one_storey(self):
+        levels = cluster_floor_levels([0.0, 0.02, -0.01], [10.0, 10.0, 10.0])
+        self.assertEqual(len(levels), 1)
+
+    def test_no_heights_means_no_levels(self):
+        self.assertEqual(cluster_floor_levels([]), [])
+
+    def test_floor_index_snaps_to_the_nearest_storey(self):
+        levels = cluster_floor_levels(*self.two_storey())
+        self.assertEqual(floor_index_for(levels, 0.4), 0)
+        self.assertEqual(floor_index_for(levels, 2.9), 1)
+        self.assertEqual(floor_index_for(levels, 99.0), 1)
+
+    def test_floor_index_without_levels_is_the_ground_floor(self):
+        self.assertEqual(floor_index_for([], 12.0), 0)
+
+
+class FloorRestrictionTest(unittest.TestCase):
+    def setUp(self):
+        self.candidates = [
+            anchor("counter_1", "kitchen counter", "kitchen", "_1", floor=0),
+            anchor("table_1", "dining table", "dining_room", "_2", floor=0),
+            anchor("shelf_1", "shelf", "kitchen", "_1", floor=0),
+            anchor("desk_1", "desk", "office", "_3", floor=1),
+            anchor("table_2", "table", "living_room", "_4", floor=1),
+            anchor("nightstand_1", "night stand", "bedroom", "_5", floor=1),
+            anchor("shelf_2", "shelf", "bedroom", "_6", floor=2),
+        ]
+
+    def test_one_floor_keeps_only_the_densest_storey(self):
+        kept = restrict_to_floors(self.candidates, max_floors=1)
+        self.assertEqual({c.floor_index for c in kept}, {0})
+
+    def test_two_floors_keeps_the_two_densest_storeys(self):
+        kept = restrict_to_floors(self.candidates, max_floors=2)
+        self.assertEqual({c.floor_index for c in kept}, {0, 1})
+
+    def test_a_nearly_empty_storey_is_not_worth_the_stairs(self):
+        kept = restrict_to_floors(self.candidates, max_floors=2, min_anchors=4)
+        self.assertEqual({c.floor_index for c in kept}, {0})
+
+    def test_no_candidates_is_not_an_error(self):
+        self.assertEqual(restrict_to_floors([], max_floors=2), [])
+
+
+class MultifloorPlanningTest(unittest.TestCase):
+    def setUp(self):
+        self.rng = random.Random(7)
+        self.handles = {t.semantic_id: t.handle for t in DUALMAP_TARGETS}
+        self.candidates = [
+            anchor("counter_1", "kitchen counter", "kitchen", "_1", (0.0, 0.45, 0.0), floor=0),
+            anchor("island_1", "kitchen island", "kitchen", "_1", (2.0, 0.45, 0.0), floor=0),
+            anchor("table_1", "dining table", "dining_room", "_2", (4.0, 0.4, 0.0), floor=0),
+            anchor("shelf_1", "shelf", "kitchen", "_1", (1.0, 0.5, 2.0), floor=0),
+            anchor("desk_1", "desk", "office", "_3", (12.0, 3.4, 0.0), floor=1),
+            anchor("table_2", "table", "living_room", "_4", (8.0, 3.4, 0.0), floor=1),
+            anchor("counter_2", "counter", "kitchen", "_5", (9.0, 3.45, 2.0), floor=1),
+            anchor("cabinet_2", "cabinet", "kitchen", "_5", (10.0, 3.5, 2.0), floor=1),
+        ]
+
+    def test_a_floor_quota_spreads_the_static_layout_over_both_storeys(self):
+        plan = plan_static_layout(
+            DUALMAP_TARGETS,
+            self.candidates,
+            self.rng,
+            floor_quota=balanced_floor_quota([0, 1], 8),
+        )
+        occupancy = floor_occupancy(plan.assignments)
+        self.assertGreaterEqual(occupancy.get(0, 0), 2)
+        self.assertGreaterEqual(occupancy.get(1, 0), 2)
+
+    def test_a_quota_that_cannot_be_met_rejects_the_plan(self):
+        single_storey = [c for c in self.candidates if c.floor_index == 0]
+        plan = plan_static_layout(
+            DUALMAP_TARGETS,
+            single_storey,
+            self.rng,
+            floor_quota={0: 4, 1: 4},
+        )
+        self.assertEqual(plan.assignments, {})
+
+    def test_balanced_quota_splits_evenly(self):
+        self.assertEqual(balanced_floor_quota([0, 1], 8), {0: 4, 1: 4})
+        self.assertEqual(balanced_floor_quota([2, 0], 7), {0: 4, 2: 3})
+        self.assertEqual(balanced_floor_quota([], 8), {})
+
+    def static_plan(self):
+        plan = plan_static_layout(
+            DUALMAP_TARGETS,
+            self.candidates,
+            self.rng,
+            floor_quota=balanced_floor_quota([0, 1], 8),
+        )
+        self.assertTrue(plan.assignments)
+        return plan
+
+    def test_cross_anchor_moves_the_requested_number_of_storeys(self):
+        static = self.static_plan()
+        cross = plan_cross_anchor_layout(
+            static.assignments,
+            self.handles,
+            self.candidates,
+            self.rng,
+            cross_floor_quota=2,
+        )
+        self.assertTrue(cross.assignments)
+        self.assertEqual(len(cross_floor_moves(static.assignments, cross.assignments)), 2)
+
+    def test_cross_anchor_still_changes_every_anchor(self):
+        static = self.static_plan()
+        cross = plan_cross_anchor_layout(
+            static.assignments,
+            self.handles,
+            self.candidates,
+            self.rng,
+            cross_floor_quota=2,
+        )
+        for semantic_id, candidate in cross.assignments.items():
+            self.assertNotEqual(
+                candidate.object_id, static.assignments[semantic_id].object_id
+            )
+
+    def test_a_cross_floor_destination_is_still_affordance_valid(self):
+        static = self.static_plan()
+        cross = plan_cross_anchor_layout(
+            static.assignments,
+            self.handles,
+            self.candidates,
+            self.rng,
+            cross_floor_quota=3,
+        )
+        for semantic_id, candidate in cross.assignments.items():
+            affordance = affordance_for(self.handles[semantic_id])
+            self.assertTrue(affordance.allows(candidate.kind, candidate.room))
+
+    def test_without_a_quota_nothing_changes_storey(self):
+        static = self.static_plan()
+        cross = plan_cross_anchor_layout(
+            static.assignments,
+            self.handles,
+            self.candidates,
+            self.rng,
+        )
+        self.assertEqual(cross_floor_moves(static.assignments, cross.assignments), [])
+
+    def test_a_quota_on_a_single_storey_scene_has_no_movers(self):
+        ground = [c for c in self.candidates if c.floor_index == 0]
+        static = plan_static_layout(DUALMAP_TARGETS, ground, self.rng)
+        self.assertEqual(
+            select_cross_floor_movers(
+                static.assignments, self.handles, ground, self.rng, quota=2
+            ),
+            set(),
+        )
+
+    def test_sibling_layouts_do_not_repeat_the_same_floor_change(self):
+        static = self.static_plan()
+        first = plan_cross_anchor_layout(
+            static.assignments,
+            self.handles,
+            self.candidates,
+            self.rng,
+            cross_floor_quota=1,
+        )
+        second = plan_cross_anchor_layout(
+            static.assignments,
+            self.handles,
+            self.candidates,
+            self.rng,
+            avoid=[first.assignments],
+            cross_floor_quota=1,
+        )
+        self.assertNotEqual(
+            cross_floor_moves(static.assignments, first.assignments),
+            cross_floor_moves(static.assignments, second.assignments),
+        )
 
 
 if __name__ == "__main__":

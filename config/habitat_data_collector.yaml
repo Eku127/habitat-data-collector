@@ -108,13 +108,13 @@ authoring:
       handle: 024_bowl
     - key: 6
       semantic_id: 50008
-      handle: 025_mug
+      handle: 072-a_toy_airplane
     - key: 7
       semantic_id: 50005
-      handle: 029_plate
+      handle: 002_master_chef_can
     - key: 8
       semantic_id: 50006
-      handle: 037_scissors
+      handle: 006_mustard_bottle
 
 # PLACEHOLDER, for mapping semantic_id to object handle
 # Do not Delete this holder

@@ -76,8 +76,31 @@ class AuthoringTreeValidatorTest(unittest.TestCase):
                 json.dumps(make_layout("static"))
             )
             errors = validate_scene(scene_root, False)
-            self.assertEqual(6, len(errors))
-            self.assertTrue(all("Missing file" in error for error in errors))
+            # The validator reads the layout count off disk rather than
+            # assuming one, so a scene with no dynamic layouts at all is
+            # reported as a missing *kind*, not as N missing filenames.
+            self.assertEqual(2, len(errors))
+            self.assertTrue(any("no in_anchor layout" in e for e in errors))
+            self.assertTrue(any("no cross_anchor layout" in e for e in errors))
+
+    def test_a_scene_with_one_layout_per_kind_is_valid(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            scene_root = Path(temp_dir) / "scene"
+            scene_root.mkdir()
+            (scene_root / "static_scene_config.json").write_text(
+                json.dumps(make_layout("static"))
+            )
+            for layout_type in ("in_anchor", "cross_anchor"):
+                path = (
+                    scene_root
+                    / "dynamic_scene_config"
+                    / layout_type
+                    / "layout_01.json"
+                )
+                path.parent.mkdir(parents=True, exist_ok=True)
+                prefix = "static" if layout_type == "in_anchor" else "cross"
+                path.write_text(json.dumps(make_layout(layout_type, 1, prefix)))
+            self.assertEqual([], validate_scene(scene_root, False))
 
 
 if __name__ == "__main__":

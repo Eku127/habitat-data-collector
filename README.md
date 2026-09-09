@@ -198,7 +198,21 @@ to generate whole multi-scene datasets headlessly:
 xvfb-run -a python scripts/auto_dualmap_authoring.py --split val scan \
   --report outputs/dualmap_authoring/scan_val.json
 xvfb-run -a python scripts/auto_dualmap_authoring.py --split val build \
-  --from-scan outputs/dualmap_authoring/scan_val.json --count 15
+  --from-scan outputs/dualmap_authoring/scan_val.json \
+  --count 15 --multifloor-count 5
+```
+
+Each scene gets three layouts — a static baseline, one in-anchor layout (every
+object moved, same surface) and one cross-anchor layout (every object moved to a
+different surface); pass `--layouts-per-kind 3` for the seven-layout structure
+the released DualMap data ships. Multi-storey scenes spread the static layout
+over two floors and move one to three objects between them in the cross-anchor
+layout. Every placement in the staged dataset is shown in
+[the dataset review document](documents/dualmap_authoring/dataset_review.md),
+so layouts can be judged without opening Habitat:
+
+```bash
+python scripts/report_dualmap_dataset.py
 ```
 
 

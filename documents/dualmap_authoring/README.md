@@ -24,9 +24,9 @@ Use the number keys to select an object:
 | `3` | `011_banana` | `50007` |
 | `4` | `019_pitcher_base` | `50003` |
 | `5` | `024_bowl` | `50004` |
-| `6` | `025_mug` | `50008` |
-| `7` | `029_plate` | `50005` |
-| `8` | `037_scissors` | `50006` |
+| `6` | `072-a_toy_airplane` | `50008` |
+| `7` | `002_master_chef_can` | `50005` |
+| `8` | `006_mustard_bottle` | `50006` |
 
 The `50001`–`50008` IDs are reserved authoring IDs. Do not replace them with
 IDs copied from an existing DualMap scene. Values such as `95` for
@@ -153,21 +153,17 @@ The result is:
 The static configuration must exist first. The launcher automatically loads it
 as the baseline for every dynamic session.
 
-Create the three in-anchor layouts:
+A complete scene needs at least one layout of each kind:
 
 ```bash
 scripts/run_dualmap_authoring.sh 00829 in_anchor 1
-scripts/run_dualmap_authoring.sh 00829 in_anchor 2
-scripts/run_dualmap_authoring.sh 00829 in_anchor 3
-```
-
-Create the three cross-anchor layouts:
-
-```bash
 scripts/run_dualmap_authoring.sh 00829 cross_anchor 1
-scripts/run_dualmap_authoring.sh 00829 cross_anchor 2
-scripts/run_dualmap_authoring.sh 00829 cross_anchor 3
 ```
+
+The launcher also accepts indices 2 and 3, so a scene can carry up to three of
+each. The staged dataset uses one of each; the released DualMap data ships
+three. Nothing downstream assumes a number — the validator, the verifier, the
+renderer and the review report all read the layouts that are on disk.
 
 For each session, select every object that was placed in the static scene and
 relocate it with `v`. Press `e` after the HUD shows that every required object
@@ -202,17 +198,16 @@ Authoring files are staged under `/app/outputs/dualmap_authoring`:
 ├── static_scene_config.json
 └── dynamic_scene_config/
     ├── in_anchor/
-    │   ├── layout_01.json
-    │   ├── layout_02.json
-    │   └── layout_03.json
+    │   └── layout_01.json     # layout_02, layout_03 optional
     └── cross_anchor/
-        ├── layout_01.json
-        ├── layout_02.json
-        └── layout_03.json
+        └── layout_01.json
 ```
 
-One complete scene therefore requires seven saved files: one static layout and
-six dynamic layouts. Twelve new scenes require 84 authoring sessions/files.
+One complete scene therefore requires three saved files at minimum — one static
+layout and one of each dynamic kind — so 15 scenes are 45 authoring sessions.
+Authoring all three of each kind instead makes that seven files per scene and
+105 sessions, which is what
+[automated dataset authoring](automated_dataset.md) exists to avoid.
 
 Files are written atomically. Existing slots are protected by default. To
 intentionally replace one, relaunch that exact slot with `--overwrite`:
@@ -321,7 +316,7 @@ Authoring startup intentionally fails unless all eight menu templates are
 available. Check the directory or install the assets:
 
 ```bash
-ls data/objects/ycb/configs/{003_cracker_box,005_tomato_soup_can,011_banana,019_pitcher_base,024_bowl,025_mug,029_plate,037_scissors}.object_config.json
+ls data/objects/ycb/configs/{003_cracker_box,005_tomato_soup_can,011_banana,019_pitcher_base,024_bowl,072-a_toy_airplane,002_master_chef_can,006_mustard_bottle}.object_config.json
 scripts/download_ycb.sh
 ```
 
@@ -350,10 +345,11 @@ the same launcher command with `--overwrite`.
 For every scene:
 
 - [ ] Static layout contains 6–8 unique menu objects and saves successfully.
-- [ ] In-anchor layouts 1, 2, and 3 exist and pass validation.
-- [ ] Cross-anchor layouts 1, 2, and 3 exist and pass validation.
+- [ ] At least one in-anchor layout exists and passes validation.
+- [ ] At least one cross-anchor layout exists and passes validation.
 - [ ] The complete scene passes `validate_dualmap_authoring.py`.
-- [ ] Generated JSON has been reviewed before promotion from the staging tree.
+- [ ] The placements have been looked at, not just validated — see
+      [the dataset review document](dataset_review.md).
 
 Promotion into the final dataset tree and automated navigation experiment
 execution are separate from this authoring mode.

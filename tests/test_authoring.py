@@ -68,7 +68,7 @@ class AuthoringHelpersTest(unittest.TestCase):
         )
         self.assertFalse(any("999_unrelated" in value for value in resolved.values()))
 
-        with self.assertRaisesRegex(ValueError, "037_scissors"):
+        with self.assertRaisesRegex(ValueError, "006_mustard_bottle"):
             target_template_handles(available[:-2], DUALMAP_TARGETS)
 
     def test_layout_output_paths(self):

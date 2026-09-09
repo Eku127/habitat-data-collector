@@ -106,7 +106,7 @@ class InputAndObjectInteractionTest(unittest.TestCase):
         input_handler = InputHandler(self.state, self.sim, self.events)
         with patch("cv2.waitKey", return_value=ord("8")):
             self.assertTrue(input_handler.poll())
-        self.assertEqual("037_scissors", self.state.authoring.selected_target.handle)
+        self.assertEqual("006_mustard_bottle", self.state.authoring.selected_target.handle)
 
     def test_duplicate_place_is_rejected(self):
         target = self.state.authoring.selected_target
